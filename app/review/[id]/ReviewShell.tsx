@@ -85,6 +85,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const [editTitle, setEditTitle] = useState('')
   const [editBody, setEditBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
   const [phaseStatuses, setPhaseStatuses] = useState<
     Record<string, PhaseStatus>
@@ -301,6 +302,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           ? `Submitted: ${data.summary.accepted} accepted, ${data.summary.rejected} rejected`
           : `Error: ${data.error}`
       )
+      if (res.ok) setSubmitted(true)
     } catch {
       setSubmitResult('Error: unexpected server response')
     } finally {
@@ -324,6 +326,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
             : '✓ Marked as approved'
           : `Error: ${data.error}`
       )
+      if (res.ok) setSubmitted(true)
     } catch {
       setSubmitResult('Error: unexpected server response')
     } finally {
@@ -492,32 +495,45 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
         {/* Submit controls */}
         {status === 'done' && total > 0 && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              disabled={submitting}
-              onClick={() => handleSubmit(true)}
-              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
-            </button>
+          <div className="mt-6">
+            {submitted ? (
+              <p className="rounded-lg border border-green-700 bg-green-950/40 px-4 py-2.5 text-sm font-medium text-green-400">
+                {submitResult}
+              </p>
+            ) : (
+              <button
+                disabled={submitting}
+                onClick={() => handleSubmit(true)}
+                className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
+              </button>
+            )}
           </div>
         )}
 
         {/* Clean review: no findings → Approve CTA */}
         {status === 'done' && total === 0 && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              disabled={submitting}
-              onClick={() => handleApprove(true)}
-              className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
-            >
-              {submitting ? 'Approving…' : '✓ Approve PR on GitHub'}
-            </button>
+          <div className="mt-6">
+            {submitted ? (
+              <p className="rounded-lg border border-green-700 bg-green-950/40 px-4 py-2.5 text-sm font-medium text-green-400">
+                {submitResult}
+              </p>
+            ) : (
+              <button
+                disabled={submitting}
+                onClick={() => handleApprove(true)}
+                className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+              >
+                {submitting ? 'Approving…' : '✓ Approve PR on GitHub'}
+              </button>
+            )}
           </div>
         )}
 
-        {submitResult && (
-          <p className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-green-400">
+        {/* Error result (only shown when not yet submitted successfully) */}
+        {submitResult && !submitted && (
+          <p className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-red-400">
             {submitResult}
           </p>
         )}
