@@ -12,22 +12,23 @@
 
 8 files changed. 7 read in full, 1 legitimately skipped.
 
-| File | Status |
-|---|---|
-| `Dockerfile` | ✅ Read |
-| `railway.json` | ✅ Read |
-| `app/api/health/route.ts` | ✅ Read |
-| `src/harness/review-cache.ts` | ✅ Read |
-| `app/api/review/[id]/route.ts` | ✅ Read |
-| `app/api/review/[id]/finalize/route.ts` | ✅ Read |
-| `src/harness/models.ts` | ✅ Read (factory section — lines 147–163) |
-| `CURRENT_STATE.md` | ⬜ Skipped (session notes, not code) |
+| File                                    | Status                                    |
+| --------------------------------------- | ----------------------------------------- |
+| `Dockerfile`                            | ✅ Read                                   |
+| `railway.json`                          | ✅ Read                                   |
+| `app/api/health/route.ts`               | ✅ Read                                   |
+| `src/harness/review-cache.ts`           | ✅ Read                                   |
+| `app/api/review/[id]/route.ts`          | ✅ Read                                   |
+| `app/api/review/[id]/finalize/route.ts` | ✅ Read                                   |
+| `src/harness/models.ts`                 | ✅ Read (factory section — lines 147–163) |
+| `CURRENT_STATE.md`                      | ⬜ Skipped (session notes, not code)      |
 
 ---
 
 ## 🎫 Ticket Context
 
 **FIR-8**: Wire agents into web routes + Railway deployment.
+
 - E.1: Wire start route → coordinator, persist reviewId to Supabase
 - E.2: Wire SSE route → stream domain results (done in FIR-6)
 - E.3: Wire finalize route → store_review + optional post_review_comment
@@ -72,6 +73,7 @@ This PR ships the deployment infrastructure and wires the two remaining stub rou
 `Dockerfile` stage 2 does `COPY --from=deps ... node_modules` then `COPY . .`. If a local `node_modules` directory is in the Docker build context, the second `COPY` overwrites the clean install with whatever is on the host. Railway builds from GitHub (where `node_modules` is gitignored) so this won't bite in CI — but `docker build .` locally would silently use the wrong modules.
 
 Minimal `.dockerignore`:
+
 ```
 node_modules
 .next
