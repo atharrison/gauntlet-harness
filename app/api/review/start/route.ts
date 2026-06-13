@@ -68,14 +68,6 @@ export function GET(request: NextRequest) {
   }
 
   const reviewId = uuidv4()
-  // Use x-forwarded-host/proto so redirects work behind Railway's proxy.
-  // request.url uses the internal binding address (0.0.0.0:PORT) which is wrong.
-  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
-  const host =
-    request.headers.get('x-forwarded-host') ??
-    request.headers.get('host') ??
-    new URL(request.url).host
-  const baseUrl = `${proto}://${host}`
   return NextResponse.redirect(
     new URL(
       `/review/${reviewId}?prUrl=${encodeURIComponent(parsed.data)}`,
