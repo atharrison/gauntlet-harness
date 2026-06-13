@@ -51,8 +51,7 @@ Steps:
 
   return {
     ...parsed,
-    externalContextCalls:
-      parsed.externalContextCalls + result.turnsUsed,
+    externalContextCalls: parsed.externalContextCalls + result.turnsUsed,
   }
 }
 

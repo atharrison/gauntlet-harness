@@ -1,159 +1,151 @@
-"use client";
+'use client'
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react'
 
 interface Finding {
-  id: string;
-  severity: "BLOCKING" | "SUGGESTION" | "NIT";
-  category: string;
-  file: string;
-  line?: number;
-  title: string;
-  body: string;
-  confidence: number;
-  suggestedFix?: string;
+  id: string
+  severity: 'BLOCKING' | 'SUGGESTION' | 'NIT'
+  category: string
+  file: string
+  line?: number
+  title: string
+  body: string
+  confidence: number
+  suggestedFix?: string
 }
 
 interface FindingDecision {
-  findingId: string;
-  accepted: boolean;
-  editedText?: string;
+  findingId: string
+  accepted: boolean
+  editedText?: string
 }
 
-type StreamStatus = "connecting" | "running" | "done" | "error";
+type StreamStatus = 'connecting' | 'running' | 'done' | 'error'
 
-const SEVERITY_STYLES: Record<Finding["severity"], string> = {
-  BLOCKING: "border-red-600 bg-red-950/30",
-  SUGGESTION: "border-yellow-600 bg-yellow-950/30",
-  NIT: "border-gray-700 bg-gray-900/50",
-};
+const SEVERITY_STYLES: Record<Finding['severity'], string> = {
+  BLOCKING: 'border-red-600 bg-red-950/30',
+  SUGGESTION: 'border-yellow-600 bg-yellow-950/30',
+  NIT: 'border-gray-700 bg-gray-900/50',
+}
 
-const SEVERITY_BADGE: Record<Finding["severity"], string> = {
-  BLOCKING: "bg-red-700 text-red-100",
-  SUGGESTION: "bg-yellow-700 text-yellow-100",
-  NIT: "bg-gray-700 text-gray-300",
-};
+const SEVERITY_BADGE: Record<Finding['severity'], string> = {
+  BLOCKING: 'bg-red-700 text-red-100',
+  SUGGESTION: 'bg-yellow-700 text-yellow-100',
+  NIT: 'bg-gray-700 text-gray-300',
+}
 
 interface Props {
-  reviewId: string;
-  prUrl: string;
+  reviewId: string
+  prUrl: string
 }
 
 export function ReviewShell({ reviewId, prUrl }: Props) {
-  const [status, setStatus] = useState<StreamStatus>("connecting");
-  const [findings, setFindings] = useState<Finding[]>([]);
+  const [status, setStatus] = useState<StreamStatus>('connecting')
+  const [findings, setFindings] = useState<Finding[]>([])
   const [decisions, setDecisions] = useState<Record<string, FindingDecision>>(
-    {},
-  );
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<string | null>(null);
-  const [events, setEvents] = useState<string[]>([]);
-  const esRef = useRef<EventSource | null>(null);
+    {}
+  )
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState<string | null>(null)
+  const [events, setEvents] = useState<string[]>([])
+  const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     const es = new EventSource(
-      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`,
-    );
-    esRef.current = es;
+      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`
+    )
+    esRef.current = es
 
-    es.addEventListener("connected", () => {
-      setStatus("running");
-      setEvents((prev) => [...prev, "Connected to review stream"]);
-    });
+    es.addEventListener('connected', () => {
+      setStatus('running')
+      setEvents(prev => [...prev, 'Connected to review stream'])
+    })
 
-    es.addEventListener("finding", (e) => {
-      const finding: Finding = JSON.parse(e.data).finding;
-      setFindings((prev) => [...prev, finding]);
-      setDecisions((prev) => ({
+    es.addEventListener('finding', e => {
+      const finding: Finding = JSON.parse(e.data).finding
+      setFindings(prev => [...prev, finding])
+      setDecisions(prev => ({
         ...prev,
         [finding.id]: {
           findingId: finding.id,
-          accepted: finding.severity !== "NIT",
+          accepted: finding.severity !== 'NIT',
         },
-      }));
-    });
+      }))
+    })
 
-    es.addEventListener("checkpoint", (e) => {
-      const data = JSON.parse(e.data);
-      setEvents((prev) => [
-        ...prev,
-        `Checkpoint: ${data.stage} → ${data.status}`,
-      ]);
-    });
+    es.addEventListener('checkpoint', e => {
+      const data = JSON.parse(e.data)
+      setEvents(prev => [...prev, `Checkpoint: ${data.stage} → ${data.status}`])
+    })
 
-    es.addEventListener("alarm", (e) => {
-      const data = JSON.parse(e.data);
-      setEvents((prev) => [
-        ...prev,
-        `⚠ Alarm: ${data.alarm?.type ?? "unknown"}`,
-      ]);
-    });
+    es.addEventListener('alarm', e => {
+      const data = JSON.parse(e.data)
+      setEvents(prev => [...prev, `⚠ Alarm: ${data.alarm?.type ?? 'unknown'}`])
+    })
 
-    es.addEventListener("done", () => {
-      setStatus("done");
-      setEvents((prev) => [...prev, "Review complete"]);
-      es.close();
-    });
+    es.addEventListener('done', () => {
+      setStatus('done')
+      setEvents(prev => [...prev, 'Review complete'])
+      es.close()
+    })
 
     es.onerror = () => {
-      setStatus("error");
-      es.close();
-    };
+      setStatus('error')
+      es.close()
+    }
 
-    return () => es.close();
-  }, [reviewId]);
+    return () => es.close()
+  }, [reviewId])
 
   function toggle(id: string) {
-    setDecisions((prev) => ({
+    setDecisions(prev => ({
       ...prev,
       [id]: { ...prev[id], accepted: !prev[id].accepted },
-    }));
+    }))
   }
 
   function startEdit(finding: Finding) {
-    setEditingId(finding.id);
-    setEditText(
-      decisions[finding.id]?.editedText ?? finding.suggestedFix ?? "",
-    );
+    setEditingId(finding.id)
+    setEditText(decisions[finding.id]?.editedText ?? finding.suggestedFix ?? '')
   }
 
   function saveEdit(id: string) {
-    setDecisions((prev) => ({
+    setDecisions(prev => ({
       ...prev,
       [id]: { ...prev[id], editedText: editText || undefined },
-    }));
-    setEditingId(null);
+    }))
+    setEditingId(null)
   }
 
   async function handleSubmit(postComment: boolean) {
-    setSubmitting(true);
+    setSubmitting(true)
     try {
       const body = {
         decisions: Object.values(decisions),
         postComment,
-      };
+      }
       const res = await fetch(`/api/review/${reviewId}/finalize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      });
-      const data = await res.json();
+      })
+      const data = await res.json()
       setSubmitResult(
         res.ok
           ? `Submitted: ${data.summary.accepted} accepted, ${data.summary.rejected} rejected`
-          : `Error: ${data.error}`,
-      );
+          : `Error: ${data.error}`
+      )
     } catch {
-      setSubmitResult("Error: unexpected server response");
+      setSubmitResult('Error: unexpected server response')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
   }
 
-  const accepted = Object.values(decisions).filter((d) => d.accepted).length;
-  const total = findings.length;
+  const accepted = Object.values(decisions).filter(d => d.accepted).length
+  const total = findings.length
 
   return (
     <div className="flex gap-6">
@@ -179,37 +171,37 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
         {/* Status bar */}
         <div className="mb-4 flex items-center gap-3">
           <StatusIndicator status={status} />
-          {status === "done" && total > 0 && (
+          {status === 'done' && total > 0 && (
             <span className="text-sm text-gray-400">
-              {total} finding{total !== 1 ? "s" : ""} — {accepted} accepted
+              {total} finding{total !== 1 ? 's' : ''} — {accepted} accepted
             </span>
           )}
         </div>
 
         {/* Findings list */}
-        {findings.length === 0 && status !== "done" && (
+        {findings.length === 0 && status !== 'done' && (
           <div className="rounded-lg border border-gray-800 bg-gray-900 p-8 text-center text-sm text-gray-500">
-            {status === "connecting"
-              ? "Connecting to review stream…"
-              : "Agents are running — findings will appear here"}
+            {status === 'connecting'
+              ? 'Connecting to review stream…'
+              : 'Agents are running — findings will appear here'}
           </div>
         )}
 
-        {findings.length === 0 && status === "done" && (
+        {findings.length === 0 && status === 'done' && (
           <div className="rounded-lg border border-green-800 bg-green-950/30 p-8 text-center text-sm text-green-400">
             No findings — clean review!
           </div>
         )}
 
         <div className="flex flex-col gap-3">
-          {findings.map((f) => {
-            const decision = decisions[f.id];
-            const isEditing = editingId === f.id;
+          {findings.map(f => {
+            const decision = decisions[f.id]
+            const isEditing = editingId === f.id
 
             return (
               <div
                 key={f.id}
-                className={`rounded-lg border p-4 transition-opacity ${SEVERITY_STYLES[f.severity]} ${decision?.accepted === false ? "opacity-50" : ""}`}
+                className={`rounded-lg border p-4 transition-opacity ${SEVERITY_STYLES[f.severity]} ${decision?.accepted === false ? 'opacity-50' : ''}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -220,7 +212,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                     </span>
                     <span className="text-xs text-gray-400 font-mono">
                       {f.file}
-                      {f.line ? `:${f.line}` : ""}
+                      {f.line ? `:${f.line}` : ''}
                     </span>
                     <span className="text-xs text-gray-500">{f.category}</span>
                     <span className="text-xs text-gray-600">
@@ -240,7 +232,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm font-medium text-gray-100">{f.title}</p>
+                <p className="mt-2 text-sm font-medium text-gray-100">
+                  {f.title}
+                </p>
                 <p className="mt-1 text-sm text-gray-400">{f.body}</p>
 
                 {isEditing ? (
@@ -249,7 +243,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                       className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
                       rows={3}
                       value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
+                      onChange={e => setEditText(e.target.value)}
                     />
                     <div className="mt-2 flex gap-2">
                       <button
@@ -277,24 +271,24 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                       onClick={() => startEdit(f)}
                       className="mt-2 text-xs text-indigo-400 hover:underline"
                     >
-                      {decision?.editedText ? "Edit fix" : "Add fix"}
+                      {decision?.editedText ? 'Edit fix' : 'Add fix'}
                     </button>
                   </>
                 )}
               </div>
-            );
+            )
           })}
         </div>
 
         {/* Submit controls */}
-        {status === "done" && total > 0 && (
+        {status === 'done' && total > 0 && (
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               disabled={submitting}
               onClick={() => handleSubmit(false)}
               className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
             >
-              {submitting ? "Submitting…" : `Submit (${accepted}/${total})`}
+              {submitting ? 'Submitting…' : `Submit (${accepted}/${total})`}
             </button>
             <button
               disabled={submitting}
@@ -324,7 +318,10 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           ) : (
             <ul className="flex flex-col gap-1">
               {events.map((e, i) => (
-                <li key={`${i}-${e.slice(0, 20)}`} className="text-xs text-gray-400 font-mono">
+                <li
+                  key={`${i}-${e.slice(0, 20)}`}
+                  className="text-xs text-gray-400 font-mono"
+                >
                   {e}
                 </li>
               ))}
@@ -333,21 +330,21 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function StatusIndicator({ status }: { status: StreamStatus }) {
   const configs: Record<StreamStatus, { dot: string; label: string }> = {
-    connecting: { dot: "bg-yellow-400 animate-pulse", label: "Connecting" },
-    running: { dot: "bg-green-400 animate-pulse", label: "Agents running" },
-    done: { dot: "bg-indigo-400", label: "Complete" },
-    error: { dot: "bg-red-500", label: "Stream error" },
-  };
-  const { dot, label } = configs[status];
+    connecting: { dot: 'bg-yellow-400 animate-pulse', label: 'Connecting' },
+    running: { dot: 'bg-green-400 animate-pulse', label: 'Agents running' },
+    done: { dot: 'bg-indigo-400', label: 'Complete' },
+    error: { dot: 'bg-red-500', label: 'Stream error' },
+  }
+  const { dot, label } = configs[status]
   return (
     <div className="flex items-center gap-2">
       <span className={`h-2 w-2 rounded-full ${dot}`} />
       <span className="text-sm text-gray-400">{label}</span>
     </div>
-  );
+  )
 }

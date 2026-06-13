@@ -12,24 +12,24 @@
 
 16 files changed. 14 read in full, 2 legitimately skipped.
 
-| File | Status |
-|---|---|
-| `src/agents/pr-review/prompts.ts` | ✅ Read |
-| `src/agents/pr-review/context-agent.ts` | ✅ Read |
-| `src/agents/pr-review/coordinator.ts` | ✅ Read |
-| `src/agents/pr-review/correctness-agent.ts` | ✅ Read |
-| `src/agents/pr-review/security-agent.ts` | ✅ Read (identical structure to correctness-agent) |
-| `src/agents/pr-review/merge.ts` | ✅ Read |
-| `src/agents/pr-review/approval.ts` | ✅ Read |
-| `src/harness/models.ts` | ✅ Read |
-| `src/harness/loop.ts` | ✅ Read |
-| `app/api/review/[id]/route.ts` | ✅ Read |
-| `app/review/[id]/ReviewShell.tsx` | ✅ Read |
-| `tests/merge.test.ts` | ✅ Read |
-| `tests/approval.test.ts` | ✅ Read |
-| `tests/coordinator.test.ts` | ✅ Read |
-| `.gitignore` | ✅ Read |
-| `tsconfig.tsbuildinfo` | ⬜ Skipped (deleted build artifact — correct action) |
+| File                                        | Status                                               |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `src/agents/pr-review/prompts.ts`           | ✅ Read                                              |
+| `src/agents/pr-review/context-agent.ts`     | ✅ Read                                              |
+| `src/agents/pr-review/coordinator.ts`       | ✅ Read                                              |
+| `src/agents/pr-review/correctness-agent.ts` | ✅ Read                                              |
+| `src/agents/pr-review/security-agent.ts`    | ✅ Read (identical structure to correctness-agent)   |
+| `src/agents/pr-review/merge.ts`             | ✅ Read                                              |
+| `src/agents/pr-review/approval.ts`          | ✅ Read                                              |
+| `src/harness/models.ts`                     | ✅ Read                                              |
+| `src/harness/loop.ts`                       | ✅ Read                                              |
+| `app/api/review/[id]/route.ts`              | ✅ Read                                              |
+| `app/review/[id]/ReviewShell.tsx`           | ✅ Read                                              |
+| `tests/merge.test.ts`                       | ✅ Read                                              |
+| `tests/approval.test.ts`                    | ✅ Read                                              |
+| `tests/coordinator.test.ts`                 | ✅ Read                                              |
+| `.gitignore`                                | ✅ Read                                              |
+| `tsconfig.tsbuildinfo`                      | ⬜ Skipped (deleted build artifact — correct action) |
 
 ---
 
@@ -75,9 +75,9 @@ This PR delivers the core intelligence of the harness — replacing every stub w
 
 **File:** `coordinator.ts` lines 89–100 and `merge.ts` lines 43–61
 
-Domain agents emit `finding` events *before* the merge step. After merge, duplicate findings are collapsed and one ID is dropped. The `ReviewShell` builds its decision map from the SSE `finding` events, but the final `PRReview` stored at the OUTPUT checkpoint contains the *merged* findings with a subset of those IDs.
+Domain agents emit `finding` events _before_ the merge step. After merge, duplicate findings are collapsed and one ID is dropped. The `ReviewShell` builds its decision map from the SSE `finding` events, but the final `PRReview` stored at the OUTPUT checkpoint contains the _merged_ findings with a subset of those IDs.
 
-When the user submits decisions, `formatGitHubComment` builds a `byId` map from `review.blockingIssues/suggestions/nits`. Any decision referencing a finding ID that was deduped away silently produces no output. Worse — the finding that *was* kept may have no decision if the user only acted on the dropped duplicate.
+When the user submits decisions, `formatGitHubComment` builds a `byId` map from `review.blockingIssues/suggestions/nits`. Any decision referencing a finding ID that was deduped away silently produces no output. Worse — the finding that _was_ kept may have no decision if the user only acted on the dropped duplicate.
 
 **Fix:** Emit `finding` events after Phase 3 (merge), not during Phase 2:
 
@@ -85,11 +85,21 @@ When the user submits decisions, `formatGitHubComment` builds a `byId` map from 
 // Phase 2 — just collect results, no emit
 const [correctnessResult, securityResult] = await Promise.all([
   runCorrectnessAgent({ enrichedContext, model: deps.model }).then(r => {
-    emit('checkpoint', { stage: 'DOMAIN', agentName: 'correctness', status: 'PASS', reviewId })
+    emit('checkpoint', {
+      stage: 'DOMAIN',
+      agentName: 'correctness',
+      status: 'PASS',
+      reviewId,
+    })
     return r
   }),
   runSecurityAgent({ enrichedContext, model: deps.model }).then(r => {
-    emit('checkpoint', { stage: 'DOMAIN', agentName: 'security', status: 'PASS', reviewId })
+    emit('checkpoint', {
+      stage: 'DOMAIN',
+      agentName: 'security',
+      status: 'PASS',
+      reviewId,
+    })
     return r
   }),
 ])
@@ -114,7 +124,7 @@ mergedFindings.forEach(f => emit('finding', { finding: f }))
  */
 ```
 
-`buildSubmission` includes *all* decisions (`Object.values(state.decisions)`) — REJECTs too. `formatGitHubComment` correctly filters to `d.action !== 'REJECT'` itself. The comment is misleading; update it to say "includes all decisions; the caller is responsible for filtering REJECTs."
+`buildSubmission` includes _all_ decisions (`Object.values(state.decisions)`) — REJECTs too. `formatGitHubComment` correctly filters to `d.action !== 'REJECT'` itself. The comment is misleading; update it to say "includes all decisions; the caller is responsible for filtering REJECTs."
 
 ---
 
@@ -166,14 +176,14 @@ return {
 **File:** `app/api/review/[id]/route.ts` line 24
 
 ```typescript
-const mode = (searchParams.get("mode") ?? "full") as "full" | "quick";
+const mode = (searchParams.get('mode') ?? 'full') as 'full' | 'quick'
 ```
 
 A type cast isn't input validation. `?mode=anything` passes through. A one-liner fix:
 
 ```typescript
-const rawMode = searchParams.get("mode")
-const mode: "full" | "quick" = rawMode === "quick" ? "quick" : "full"
+const rawMode = searchParams.get('mode')
+const mode: 'full' | 'quick' = rawMode === 'quick' ? 'quick' : 'full'
 ```
 
 ---
@@ -209,4 +219,4 @@ If `runCorrectnessAgent` or `runSecurityAgent` throws (e.g., Anthropic API timeo
 
 **Request Changes** (one blocking, rest are easy fixes)
 
-The architecture is excellent and the implementation is solid. One structural issue needs fixing before merge: SSE finding events must be emitted *after* the merge step so that the finding IDs the client builds decisions against match the IDs in the final `PRReview`. The other items are quick one-liners.
+The architecture is excellent and the implementation is solid. One structural issue needs fixing before merge: SSE finding events must be emitted _after_ the merge step so that the finding IDs the client builds decisions against match the IDs in the final `PRReview`. The other items are quick one-liners.

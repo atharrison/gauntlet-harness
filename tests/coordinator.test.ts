@@ -74,8 +74,10 @@ describe('runReview (coordinator)', () => {
         // 3 = security agent (produces DomainResult)
         // 4 = coordinator summary
         if (callCount === 1) return makeModelReply(makeEnrichedContextJson())
-        if (callCount === 2) return makeModelReply(makeEmptyDomainResult('CORRECTNESS'))
-        if (callCount === 3) return makeModelReply(makeEmptyDomainResult('SECURITY'))
+        if (callCount === 2)
+          return makeModelReply(makeEmptyDomainResult('CORRECTNESS'))
+        if (callCount === 3)
+          return makeModelReply(makeEmptyDomainResult('SECURITY'))
         return makeModelReply(makeSummaryJson())
       }),
     }
@@ -97,7 +99,7 @@ describe('runReview (coordinator)', () => {
         checkpoints,
       },
       registry,
-      dispatcher: (_reviewId) => (call) => dispatch(call, registry, _reviewId),
+      dispatcher: _reviewId => call => dispatch(call, registry, _reviewId),
     }
   }
 
@@ -129,7 +131,7 @@ describe('runReview (coordinator)', () => {
       prUrl: 'https://github.com/owner/repo/pull/1',
       mode: 'quick',
       context,
-      emit: (event) => emitted.push(event),
+      emit: event => emitted.push(event),
     })
 
     expect(emitted).toContain('done')
@@ -162,7 +164,10 @@ describe('runReview (coordinator)', () => {
       emit,
     })
 
-    expect(emit).toHaveBeenCalledWith('done', expect.objectContaining({ reviewId: 'test-rev-4' }))
+    expect(emit).toHaveBeenCalledWith(
+      'done',
+      expect.objectContaining({ reviewId: 'test-rev-4' })
+    )
   })
 
   it('does not call SSE emitter when reviewId is absent', async () => {

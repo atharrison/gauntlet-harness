@@ -1,15 +1,15 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: "PR Review Harness",
-  description: "AI-assisted PR review with multi-agent orchestration",
-};
+  title: 'PR Review Harness',
+  description: 'AI-assisted PR review with multi-agent orchestration',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en">
@@ -27,5 +27,5 @@ export default function RootLayout({
         <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
       </body>
     </html>
-  );
+  )
 }

@@ -40,11 +40,12 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
     reviewId,
     stage: 'INPUT',
     store: deps.checkpoints,
-    check: () => Promise.resolve({
-      pass: Boolean(prUrl),
-      payload: { prUrl, mode },
-      error: prUrl ? undefined : 'prUrl is required',
-    }),
+    check: () =>
+      Promise.resolve({
+        pass: Boolean(prUrl),
+        payload: { prUrl, mode },
+        error: prUrl ? undefined : 'prUrl is required',
+      }),
   })
   emit('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
 
@@ -79,7 +80,9 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
         return {
           pass,
           payload: ctx,
-          error: pass ? undefined : 'Context agent returned empty diff and no files',
+          error: pass
+            ? undefined
+            : 'Context agent returned empty diff and no files',
         }
       },
     })
@@ -91,11 +94,21 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   // so the IDs the client receives match the merged PRReview exactly.
   const [correctnessResult, securityResult] = await Promise.all([
     runCorrectnessAgent({ enrichedContext, model: deps.model }).then(r => {
-      emit('checkpoint', { stage: 'DOMAIN', agentName: 'correctness', status: 'PASS', reviewId })
+      emit('checkpoint', {
+        stage: 'DOMAIN',
+        agentName: 'correctness',
+        status: 'PASS',
+        reviewId,
+      })
       return r
     }),
     runSecurityAgent({ enrichedContext, model: deps.model }).then(r => {
-      emit('checkpoint', { stage: 'DOMAIN', agentName: 'security', status: 'PASS', reviewId })
+      emit('checkpoint', {
+        stage: 'DOMAIN',
+        agentName: 'security',
+        status: 'PASS',
+        reviewId,
+      })
       return r
     }),
   ])
@@ -184,7 +197,9 @@ function parseSummary(text: string, ctx: EnrichedContext): SummaryData {
       const raw = JSON.parse(jsonMatch[0])
       return {
         summary: String(raw.summary ?? ''),
-        whatLooksGood: Array.isArray(raw.whatLooksGood) ? raw.whatLooksGood : [],
+        whatLooksGood: Array.isArray(raw.whatLooksGood)
+          ? raw.whatLooksGood
+          : [],
         questions: Array.isArray(raw.questions) ? raw.questions : [],
         testingRecommendations: Array.isArray(raw.testingRecommendations)
           ? raw.testingRecommendations

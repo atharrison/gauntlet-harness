@@ -12,30 +12,30 @@
 
 22 files changed. 16 read in full, 6 legitimately skipped.
 
-| File | Status |
-|---|---|
-| `next.config.ts` | ✅ Read |
-| `middleware.ts` | ✅ Read |
-| `lib/supabase/client.ts` | ✅ Read |
-| `lib/supabase/server.ts` | ✅ Read |
-| `app/auth/callback/route.ts` | ✅ Read |
-| `app/layout.tsx` | ✅ Read |
-| `app/page.tsx` | ✅ Read |
-| `app/globals.css` | ✅ Read |
-| `app/api/review/start/route.ts` | ✅ Read |
-| `app/api/review/[id]/route.ts` | ✅ Read |
-| `app/api/review/[id]/finalize/route.ts` | ✅ Read |
-| `app/review/[id]/page.tsx` | ✅ Read |
-| `app/review/[id]/ReviewShell.tsx` | ✅ Read |
-| `postcss.config.mjs` | ✅ Read |
-| `eslint.config.js` | ✅ Read |
-| `src/memory/supabase.ts` | ✅ Read (env key rename only) |
-| `.env` | ✅ Read — **🔴 see blocking issue** |
-| `.env.example` | ✅ Read |
-| `PR_DESCRIPTION.md` | ⬜ Skipped (documentation artifact, not deployed code) |
-| `package.json` | ⬜ Skipped (dep additions reviewed via imports; no unexpected packages) |
-| `package-lock.json` | ⬜ Skipped (lock file) |
-| `tsconfig.tsbuildinfo` | ⬜ Skipped (incremental build cache) |
+| File                                    | Status                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `next.config.ts`                        | ✅ Read                                                                 |
+| `middleware.ts`                         | ✅ Read                                                                 |
+| `lib/supabase/client.ts`                | ✅ Read                                                                 |
+| `lib/supabase/server.ts`                | ✅ Read                                                                 |
+| `app/auth/callback/route.ts`            | ✅ Read                                                                 |
+| `app/layout.tsx`                        | ✅ Read                                                                 |
+| `app/page.tsx`                          | ✅ Read                                                                 |
+| `app/globals.css`                       | ✅ Read                                                                 |
+| `app/api/review/start/route.ts`         | ✅ Read                                                                 |
+| `app/api/review/[id]/route.ts`          | ✅ Read                                                                 |
+| `app/api/review/[id]/finalize/route.ts` | ✅ Read                                                                 |
+| `app/review/[id]/page.tsx`              | ✅ Read                                                                 |
+| `app/review/[id]/ReviewShell.tsx`       | ✅ Read                                                                 |
+| `postcss.config.mjs`                    | ✅ Read                                                                 |
+| `eslint.config.js`                      | ✅ Read                                                                 |
+| `src/memory/supabase.ts`                | ✅ Read (env key rename only)                                           |
+| `.env`                                  | ✅ Read — **🔴 see blocking issue**                                     |
+| `.env.example`                          | ✅ Read                                                                 |
+| `PR_DESCRIPTION.md`                     | ⬜ Skipped (documentation artifact, not deployed code)                  |
+| `package.json`                          | ⬜ Skipped (dep additions reviewed via imports; no unexpected packages) |
+| `package-lock.json`                     | ⬜ Skipped (lock file)                                                  |
+| `tsconfig.tsbuildinfo`                  | ⬜ Skipped (incremental build cache)                                    |
 
 ---
 
@@ -44,6 +44,7 @@
 **FIR-5**: Next.js web shell with Supabase SSR middleware and stub API routes.
 
 Requirements per MASTER_CHECKLIST.md D.1–D.6:
+
 - D.1: `next.config.ts` (standalone output), `app/layout.tsx`, `app/page.tsx`
 - D.2: Supabase SSR middleware + `/auth/callback` route handler using `@supabase/ssr`
 - D.3: `POST /api/review/start` stub → returns `{ reviewId }`
@@ -93,6 +94,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_gpWtlHlxZEEjPYZ2H-oMyw_k1Tn5
 `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are intentionally public (anon/publishable key is safe to expose). But **`SUPABASE_DB_PASSWORD` is a real secret** and should never be in a committed file.
 
 Fix before merge:
+
 ```bash
 # 1. Remove .env from git tracking entirely
 git rm --cached .env
@@ -112,12 +114,12 @@ The `NEXT_PUBLIC_*` values are fine to leave in `.env.example` (they're public b
 ```typescript
 // Safer pattern:
 try {
-  const data = await res.json();
-  setSubmitResult(res.ok ? `...` : `Error: ${data.error}`);
+  const data = await res.json()
+  setSubmitResult(res.ok ? `...` : `Error: ${data.error}`)
 } catch {
-  setSubmitResult("Error: unexpected server response");
+  setSubmitResult('Error: unexpected server response')
 } finally {
-  setSubmitting(false);
+  setSubmitting(false)
 }
 ```
 
@@ -126,9 +128,9 @@ try {
 The GET handler mints a `reviewId` and redirects to `/review/[id]?prUrl=...` without validating that `prUrl` is actually a GitHub PR URL. The POST handler validates with Zod; the GET should too. A quick check:
 
 ```typescript
-const parsed = z.string().url().safeParse(prUrl);
+const parsed = z.string().url().safeParse(prUrl)
 if (!parsed.success) {
-  return NextResponse.redirect(new URL("/?error=invalid_pr_url", request.url));
+  return NextResponse.redirect(new URL('/?error=invalid_pr_url', request.url))
 }
 ```
 

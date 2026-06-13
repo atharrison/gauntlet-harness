@@ -62,28 +62,63 @@ describe('mergeResults', () => {
   })
 
   it('does not dedup findings on different files', () => {
-    const a = makeFinding({ file: 'src/a.ts', line: 10, title: 'Null check missing' })
-    const b = makeFinding({ file: 'src/b.ts', line: 10, title: 'Null check missing' })
+    const a = makeFinding({
+      file: 'src/a.ts',
+      line: 10,
+      title: 'Null check missing',
+    })
+    const b = makeFinding({
+      file: 'src/b.ts',
+      line: 10,
+      title: 'Null check missing',
+    })
     expect(mergeResults([makeResult('CORRECTNESS', [a, b])])).toHaveLength(2)
   })
 
   it('does not dedup findings that are far apart on the same file', () => {
     const a = makeFinding({ file: 'src/a.ts', line: 10, title: 'Null check' })
-    const b = makeFinding({ file: 'src/a.ts', line: 50, title: 'Null check issue' })
+    const b = makeFinding({
+      file: 'src/a.ts',
+      line: 50,
+      title: 'Null check issue',
+    })
     expect(mergeResults([makeResult('CORRECTNESS', [a, b])])).toHaveLength(2)
   })
 
   it('applies confidence penalty (×0.9) to uncorroborated findings', () => {
-    const a = makeFinding({ id: 'solo', confidence: 1.0, file: 'src/x.ts', line: 1, title: 'Unique' })
+    const a = makeFinding({
+      id: 'solo',
+      confidence: 1.0,
+      file: 'src/x.ts',
+      line: 1,
+      title: 'Unique',
+    })
     const results = mergeResults([makeResult('CORRECTNESS', [a])])
     expect(results[0].confidence).toBeCloseTo(0.9)
   })
 
   it('sorts BLOCKING before SUGGESTION before NIT', () => {
-    const nit = makeFinding({ file: 'src/nit.ts', title: 'Nit issue', severity: 'NIT', confidence: 1.0 })
-    const blocking = makeFinding({ file: 'src/block.ts', title: 'Blocking issue', severity: 'BLOCKING', confidence: 0.7 })
-    const suggestion = makeFinding({ file: 'src/suggest.ts', title: 'Suggestion issue', severity: 'SUGGESTION', confidence: 0.8 })
-    const sorted = mergeResults([makeResult('CORRECTNESS', [nit, suggestion, blocking])])
+    const nit = makeFinding({
+      file: 'src/nit.ts',
+      title: 'Nit issue',
+      severity: 'NIT',
+      confidence: 1.0,
+    })
+    const blocking = makeFinding({
+      file: 'src/block.ts',
+      title: 'Blocking issue',
+      severity: 'BLOCKING',
+      confidence: 0.7,
+    })
+    const suggestion = makeFinding({
+      file: 'src/suggest.ts',
+      title: 'Suggestion issue',
+      severity: 'SUGGESTION',
+      confidence: 0.8,
+    })
+    const sorted = mergeResults([
+      makeResult('CORRECTNESS', [nit, suggestion, blocking]),
+    ])
     expect(sorted).toHaveLength(3)
     expect(sorted[0].severity).toBe('BLOCKING')
     expect(sorted[1].severity).toBe('SUGGESTION')
@@ -91,8 +126,18 @@ describe('mergeResults', () => {
   })
 
   it('sorts by confidence desc within same severity', () => {
-    const low = makeFinding({ file: 'src/a.ts', title: 'Low suggestion', severity: 'SUGGESTION', confidence: 0.7 })
-    const high = makeFinding({ file: 'src/b.ts', title: 'High suggestion', severity: 'SUGGESTION', confidence: 0.95 })
+    const low = makeFinding({
+      file: 'src/a.ts',
+      title: 'Low suggestion',
+      severity: 'SUGGESTION',
+      confidence: 0.7,
+    })
+    const high = makeFinding({
+      file: 'src/b.ts',
+      title: 'High suggestion',
+      severity: 'SUGGESTION',
+      confidence: 0.95,
+    })
     const sorted = mergeResults([makeResult('CORRECTNESS', [low, high])])
     expect(sorted).toHaveLength(2)
     expect(sorted[0].confidence).toBeGreaterThan(sorted[1].confidence)

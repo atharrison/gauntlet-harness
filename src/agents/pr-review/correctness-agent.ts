@@ -32,7 +32,12 @@ export async function runCorrectnessAgent(
   )
 
   const durationMs = Date.now() - start
-  return parseDomainResult(reply.text, 'CORRECTNESS', durationMs, reply.usage.inputTokens + reply.usage.outputTokens)
+  return parseDomainResult(
+    reply.text,
+    'CORRECTNESS',
+    durationMs,
+    reply.usage.inputTokens + reply.usage.outputTokens
+  )
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -56,7 +61,8 @@ function parseDomainResult(
       if (Array.isArray(raw.findings)) {
         raw.findings = raw.findings.map((f: Record<string, unknown>) => ({
           ...f,
-          id: typeof f.id === 'string' && f.id !== '<uuid>' ? f.id : randomUUID(),
+          id:
+            typeof f.id === 'string' && f.id !== '<uuid>' ? f.id : randomUUID(),
           category: domain,
         }))
       }
@@ -72,7 +78,9 @@ function parseDomainResult(
     }
   }
 
-  console.warn(`[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON`)
+  console.warn(
+    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON`
+  )
   return {
     domain,
     findings: [],

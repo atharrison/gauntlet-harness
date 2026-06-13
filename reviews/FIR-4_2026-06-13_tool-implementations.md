@@ -14,19 +14,19 @@ The PR diff is large because of the rebase (all of FIR-1 through FIR-4 appears v
 This review scopes to the **FIR-4 delta only**: the three new `src/tools/` files, `context.ts`,
 `jest.config.js`, and the three new test files. Everything else was reviewed in FIR-1/2/3.
 
-| File | Status |
-|---|---|
-| `src/tools/github.ts` | ✅ Read in full |
-| `src/tools/memory.ts` | ✅ Read in full |
-| `src/tools/tickets.ts` | ✅ Read in full |
-| `src/harness/context.ts` | ✅ Read in full |
-| `src/harness/tools.ts` | ✅ Read in full (context for ToolEntry interface) |
-| `tests/tools.github.test.ts` | ✅ Read in full |
-| `tests/tools.memory.test.ts` | ✅ Read in full |
-| `tests/tools.tickets.test.ts` | ✅ Read in full |
-| `tests/context.test.ts` | ✅ Read in full |
-| `jest.config.js` | ✅ Read in full |
-| Everything else in diff | ⬜ Skipped (unchanged from prior merged PRs FIR-1/2/3) |
+| File                          | Status                                                 |
+| ----------------------------- | ------------------------------------------------------ |
+| `src/tools/github.ts`         | ✅ Read in full                                        |
+| `src/tools/memory.ts`         | ✅ Read in full                                        |
+| `src/tools/tickets.ts`        | ✅ Read in full                                        |
+| `src/harness/context.ts`      | ✅ Read in full                                        |
+| `src/harness/tools.ts`        | ✅ Read in full (context for ToolEntry interface)      |
+| `tests/tools.github.test.ts`  | ✅ Read in full                                        |
+| `tests/tools.memory.test.ts`  | ✅ Read in full                                        |
+| `tests/tools.tickets.test.ts` | ✅ Read in full                                        |
+| `tests/context.test.ts`       | ✅ Read in full                                        |
+| `jest.config.js`              | ✅ Read in full                                        |
+| Everything else in diff       | ⬜ Skipped (unchanged from prior merged PRs FIR-1/2/3) |
 
 ---
 
@@ -81,13 +81,13 @@ The factory pattern keeps tools testable without hitting real APIs.
 **File:** `src/tools/github.ts`, line 34
 
 ```typescript
-const DRY_RUN = process.env.DRY_RUN === 'true'  // ← evaluated once at import
+const DRY_RUN = process.env.DRY_RUN === 'true' // ← evaluated once at import
 ```
 
 Because this is a module-level constant, changing `process.env.DRY_RUN` after the module is
 imported (e.g. in tests, or via a runtime config change) has no effect. The test even acknowledges
-this with a comment: *"DRY_RUN is read at module load time, so we test via the factory by checking
-the guard logic directly"* — which means the actual dry-run path (`dryRun: true` branch) is **never
+this with a comment: _"DRY_RUN is read at module load time, so we test via the factory by checking
+the guard logic directly"_ — which means the actual dry-run path (`dryRun: true` branch) is **never
 tested**.
 
 **Fix:** Read the env var inside the handler at call time:
@@ -107,8 +107,8 @@ This unblocks writing a proper test for the dry-run branch without module-load-t
 
 **File:** `src/harness/context.ts`, lines 40–47
 
-The comment block above `buildRegistry()` says *"For now it returns an empty registry so the rest
-of the composition plumbing can be exercised end-to-end before tools exist"* — but the function
+The comment block above `buildRegistry()` says _"For now it returns an empty registry so the rest
+of the composition plumbing can be exercised end-to-end before tools exist"_ — but the function
 body now fully populates the registry. Left as-is it will confuse anyone reading the file.
 
 **Fix:** Delete or update the comment to reflect the current state.

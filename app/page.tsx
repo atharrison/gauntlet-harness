@@ -31,10 +31,22 @@ export default function HomePage() {
 
       <div className="mt-16 grid grid-cols-2 gap-6 text-left sm:grid-cols-4">
         {[
-          { icon: "🛡️", label: "Guardrails", desc: "Input/output integrity checks" },
-          { icon: "✅", label: "Checkpoints", desc: "5 named stages with pass/fail" },
-          { icon: "🔧", label: "Material Handling", desc: "Typed tool dispatch + registry" },
-          { icon: "🚨", label: "Alarms", desc: "Named alerts with severity" },
+          {
+            icon: '🛡️',
+            label: 'Guardrails',
+            desc: 'Input/output integrity checks',
+          },
+          {
+            icon: '✅',
+            label: 'Checkpoints',
+            desc: '5 named stages with pass/fail',
+          },
+          {
+            icon: '🔧',
+            label: 'Material Handling',
+            desc: 'Typed tool dispatch + registry',
+          },
+          { icon: '🚨', label: 'Alarms', desc: 'Named alerts with severity' },
         ].map(({ icon, label, desc }) => (
           <div
             key={label}
@@ -47,5 +59,5 @@ export default function HomePage() {
         ))}
       </div>
     </div>
-  );
+  )
 }

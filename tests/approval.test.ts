@@ -71,8 +71,8 @@ describe('toggleDecision', () => {
 
   it('toggles EDIT → REJECT (does not promote back to ACCEPT)', () => {
     let state = buildInitialState(review)
-    state = editFinding(state, 'b1', 'my fix')       // ACCEPT → EDIT
-    const after = toggleDecision(state, 'b1')         // EDIT → REJECT
+    state = editFinding(state, 'b1', 'my fix') // ACCEPT → EDIT
+    const after = toggleDecision(state, 'b1') // EDIT → REJECT
     expect(after.decisions['b1'].action).toBe('REJECT')
   })
 
