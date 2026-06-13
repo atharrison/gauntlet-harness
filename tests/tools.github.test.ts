@@ -1,9 +1,5 @@
-// @octokit/rest is ESM-only — mock it so Jest (CJS) can load the module.
-// Our tests inject a mock Octokit directly, so the actual SDK is not needed.
-jest.mock('@octokit/rest', () => ({
-  Octokit: jest.fn(),
-}))
-
+// @octokit/rest is resolved to __mocks__/@octokit/rest.js via jest.config.js moduleNameMapper.
+// Tests inject their own mock Octokit object via the factory argument.
 import { createGithubTools } from '../src/tools/github'
 import type { Octokit } from '@octokit/rest'
 

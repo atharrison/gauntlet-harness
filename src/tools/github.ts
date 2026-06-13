@@ -33,7 +33,12 @@ const FILE_CONTENT_MAX_BYTES = 8 * 1024 // 8 KB per file — guardrail
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
-export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
+export function createGithubTools(
+  octokit: Octokit | null
+): Record<string, ToolEntry> {
+  // No token → no GitHub tools in the registry. The model adapts its strategy
+  // rather than encountering stub errors.
+  if (!octokit) return {}
   return {
     fetch_pr_diff: {
       description:
@@ -122,10 +127,8 @@ export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
 
 // ── Octokit factory ───────────────────────────────────────────────────────────
 
-export function createOctokit(): Octokit {
+export function createOctokit(): Octokit | null {
   const token = process.env.GITHUB_TOKEN
-  if (!token) {
-    throw new Error('GITHUB_TOKEN must be set')
-  }
+  if (!token) return null
   return new Octokit({ auth: token })
 }

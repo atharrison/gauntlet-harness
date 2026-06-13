@@ -15,6 +15,7 @@ import { createMemoryStore, type MemoryStore } from '../memory/index'
 import { InMemoryCheckpointStore, type CheckpointStore } from './checkpoints'
 import { dispatch, type ToolRegistry } from './tools'
 import type { ToolDispatcher } from './loop'
+import { createGithubTools, createOctokit } from '../tools/github'
 import { createMemoryTools } from '../tools/memory'
 import { createTicketTools } from '../tools/tickets'
 
@@ -38,10 +39,6 @@ export interface ReviewContext {
 // ── buildRegistry — assemble all tools given a dep set ────────────────────────
 
 export function buildRegistry(deps: ReviewDeps): ToolRegistry {
-  // GitHub tools are lazy-loaded so the Octokit ESM package doesn't break
-  // Jest's CJS environment when context.ts is imported in tests.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createGithubTools, createOctokit } = require('../tools/github')
   return {
     ...createGithubTools(createOctokit()),
     ...createMemoryTools(deps.memory),

@@ -27,5 +27,8 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // @octokit/rest ships ESM-only; redirect to a CJS stub for Jest's CommonJS runtime.
+    // Tests that need specific Octokit behaviour inject their own mock via the factory arg.
+    '^@octokit/rest$': '<rootDir>/__mocks__/@octokit/rest.js',
   },
 }

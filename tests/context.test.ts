@@ -1,11 +1,6 @@
-// Mock the github tools module — @octokit/rest is ESM-only and can't be loaded
-// by Jest's CJS runtime. buildRegistry() lazy-requires it; we mock so it
-// returns an empty object instead.
-jest.mock('../src/tools/github', () => ({
-  createGithubTools: () => ({}),
-  createOctokit: () => ({}),
-}))
-
+// @octokit/rest → __mocks__/@octokit/rest.js via moduleNameMapper (jest.config.js).
+// GITHUB_TOKEN is not set in the test environment, so createOctokit() returns null
+// and createGithubTools(null) returns {} — no GitHub tools in the registry.
 import { createReviewContext, buildRegistry } from '../src/harness/context'
 import { LocalMemoryStore } from '../src/memory/local'
 import { InMemoryCheckpointStore } from '../src/harness/checkpoints'
@@ -20,7 +15,7 @@ function tempDb() {
 }
 
 describe('buildRegistry', () => {
-  it('registers all expected tools', () => {
+  it('registers memory and ticket tools', () => {
     const memory = new LocalMemoryStore(tempDb())
     const deps = {
       model: createModelClient({ provider: 'anthropic', apiKey: 'test-key' }),
@@ -29,12 +24,25 @@ describe('buildRegistry', () => {
     }
     const registry = buildRegistry(deps)
     const names = Object.keys(registry).sort()
-    // GitHub tools (mocked), memory tools, ticket tools
     expect(names).toContain('search_past_reviews')
     expect(names).toContain('store_review')
     expect(names).toContain('create_memory')
     expect(names).toContain('fetch_ticket')
     expect(names).toContain('search_tickets')
+  })
+
+  it('excludes GitHub tools when GITHUB_TOKEN is not set', () => {
+    const saved = process.env.GITHUB_TOKEN
+    delete process.env.GITHUB_TOKEN
+    const memory = new LocalMemoryStore(tempDb())
+    const deps = {
+      model: createModelClient({ provider: 'anthropic', apiKey: 'test-key' }),
+      memory,
+      checkpoints: new InMemoryCheckpointStore(),
+    }
+    const registry = buildRegistry(deps)
+    expect(Object.keys(registry)).not.toContain('fetch_pr_diff')
+    process.env.GITHUB_TOKEN = saved
   })
 })
 

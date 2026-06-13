@@ -53,6 +53,7 @@ module.exports = tseslint.config(
       '.next/**',
       'eslint.config.js',
       'jest.config.js',
+      '__mocks__/**',
     ],
   }
 )

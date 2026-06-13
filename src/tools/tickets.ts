@@ -9,7 +9,6 @@ const FetchTicketSchema = z.object({
 
 const SearchTicketsSchema = z.object({
   query: z.string(),
-  teamKey: z.string().optional(),
   limit: z.number().optional(),
 })
 
