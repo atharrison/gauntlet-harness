@@ -15,7 +15,9 @@ export interface ReviewRecord {
   reviewedAt: string;
   findingCount: number;
   summary: string;
-  rawJson: string;
+  // Typed as unknown: SQLite returns a JSON string, Supabase returns a parsed object.
+  // Callers should always use JSON.parse/stringify explicitly rather than assuming one form.
+  rawJson: unknown;
 }
 
 export interface CodeChunk {

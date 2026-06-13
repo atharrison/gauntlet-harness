@@ -35,15 +35,18 @@ CREATE INDEX IF NOT EXISTS review_history_author_idx ON review_history (author);
 
 -- Checkpoint records: pass/fail state for each review stage.
 -- Used by resumeFromCheckpoint() to skip already-completed stages.
+-- agent_name is nullable: single-agent stages (INPUT, OUTPUT, FINALIZE) leave it null;
+-- parallel domain agents (correctness, security) set it so they don't collide on DOMAIN.
 CREATE TABLE IF NOT EXISTS review_checkpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   review_id TEXT NOT NULL,
   stage TEXT NOT NULL,
+  agent_name TEXT,
   passed BOOLEAN NOT NULL,
   message TEXT,
   payload JSONB,
   recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (review_id, stage)
+  UNIQUE (review_id, stage, agent_name)
 );
 
 CREATE INDEX IF NOT EXISTS review_checkpoints_review_idx ON review_checkpoints (review_id);

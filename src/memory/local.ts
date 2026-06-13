@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { mkdirSync } from "fs";
 import path from "path";
 import os from "os";
 import type {
@@ -15,18 +16,6 @@ function dbPath(): string {
     process.env.SQLITE_DB_PATH ??
     path.join(os.homedir(), ".gauntlet-harness", "memory.db")
   );
-}
-
-function openDb(): Database.Database {
-  const filePath = dbPath();
-  // Ensure parent directory exists
-  const { mkdirSync } = require("fs");
-  mkdirSync(path.dirname(filePath), { recursive: true });
-
-  const db = new Database(filePath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  return db;
 }
 
 function migrate(db: Database.Database): void {
@@ -57,9 +46,7 @@ export class LocalMemoryStore implements MemoryStore {
   private db: Database.Database;
 
   constructor(dbFilePath?: string) {
-    const filePath =
-      dbFilePath ?? dbPath();
-    const { mkdirSync } = require("fs");
+    const filePath = dbFilePath ?? dbPath();
     mkdirSync(path.dirname(filePath), { recursive: true });
     this.db = new Database(filePath);
     this.db.pragma("journal_mode = WAL");
@@ -141,7 +128,7 @@ export class LocalMemoryStore implements MemoryStore {
     const reviewObj = review as { summary?: string; findings?: unknown[] };
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO review_history
+        `INSERT INTO review_history
          (id, pr_url, repo_name, pr_title, author, reviewed_at, finding_count, summary, raw_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
