@@ -48,8 +48,6 @@ const PIPELINE: { key: string; label: string }[] = [
   { key: 'OUTPUT', label: 'Final review' },
 ]
 
-let activitySeq = 0
-
 function formatTool(tool: string, args: Record<string, unknown>): string {
   switch (tool) {
     case 'fetch_pr_diff':
@@ -79,12 +77,16 @@ interface Props {
 export function ReviewShell({ reviewId, prUrl }: Props) {
   const [status, setStatus] = useState<StreamStatus>('connecting')
   const [findings, setFindings] = useState<Finding[]>([])
-  const [decisions, setDecisions] = useState<Record<string, FindingDecision>>({})
+  const [decisions, setDecisions] = useState<Record<string, FindingDecision>>(
+    {}
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
-  const [phaseStatuses, setPhaseStatuses] = useState<Record<string, PhaseStatus>>({
+  const [phaseStatuses, setPhaseStatuses] = useState<
+    Record<string, PhaseStatus>
+  >({
     INPUT: 'running',
     CONTEXT: 'pending',
     DOMAIN: 'pending',
@@ -93,13 +95,18 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [elapsed, setElapsed] = useState(0)
   const startTimeRef = useRef(Date.now())
+  const domainDoneRef = useRef(0)
   const esRef = useRef<EventSource | null>(null)
   const activityEndRef = useRef<HTMLDivElement | null>(null)
+  const activitySeqRef = useRef(0)
 
   // Tick elapsed while running
   useEffect(() => {
     if (status !== 'running') return
-    const t = setInterval(() => setElapsed(Date.now() - startTimeRef.current), 1000)
+    const t = setInterval(
+      () => setElapsed(Date.now() - startTimeRef.current),
+      1000
+    )
     return () => clearInterval(t)
   }, [status])
 
@@ -109,7 +116,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   }, [activity])
 
   function addActivity(entry: Omit<ActivityEntry, 'id'>) {
-    setActivity(prev => [...prev, { ...entry, id: ++activitySeq }])
+    setActivity(prev => [...prev, { ...entry, id: ++activitySeqRef.current }])
   }
 
   useEffect(() => {
@@ -127,22 +134,28 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       const data = JSON.parse(e.data)
       if (data.stage === 'INPUT') {
         setPhaseStatuses(p => ({ ...p, INPUT: 'done', CONTEXT: 'running' }))
-        addActivity({ type: 'phase', text: '✓ Input validated — starting context agent' })
+        addActivity({
+          type: 'phase',
+          text: '✓ Input validated — starting context agent',
+        })
       } else if (data.stage === 'CONTEXT') {
         setPhaseStatuses(p => ({ ...p, CONTEXT: 'done', DOMAIN: 'running' }))
-        addActivity({ type: 'phase', text: '✓ Context gathered — running domain agents' })
-      } else if (data.stage === 'DOMAIN') {
-        const agentName = data.agentName as string
-        addActivity({ type: 'phase', text: `✓ ${agentName} agent complete` })
-        setActivity(prev => {
-          // count how many DOMAIN done entries there are now (including this one)
-          const domainCount =
-            prev.filter(a => a.text.includes('agent complete')).length + 1
-          if (domainCount >= 2) {
-            setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'running' }))
-          }
-          return prev
+        addActivity({
+          type: 'phase',
+          text: '✓ Context gathered — running domain agents',
         })
+      } else if (data.stage === 'DOMAIN') {
+        const agentName =
+          typeof data.agentName === 'string' ? data.agentName : 'unknown'
+        addActivity({ type: 'phase', text: `✓ ${agentName} agent complete` })
+        domainDoneRef.current += 1
+        if (domainDoneRef.current >= 2) {
+          setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'running' }))
+          addActivity({
+            type: 'phase',
+            text: '✓ Both domain agents done — generating summary',
+          })
+        }
       } else if (data.stage === 'OUTPUT') {
         setPhaseStatuses(p => ({ ...p, OUTPUT: 'done' }))
       }
@@ -152,7 +165,10 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       const data = JSON.parse(e.data)
       addActivity({
         type: 'tool',
-        text: formatTool(data.tool, (data.args ?? {}) as Record<string, unknown>),
+        text: formatTool(
+          data.tool,
+          (data.args ?? {}) as Record<string, unknown>
+        ),
       })
     })
 
@@ -174,7 +190,10 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
     es.addEventListener('alarm', e => {
       const data = JSON.parse(e.data)
-      addActivity({ type: 'alarm', text: `⚠ Alarm: ${data.alarm?.type ?? 'unknown'}` })
+      addActivity({
+        type: 'alarm',
+        text: `⚠ Alarm: ${data.alarm?.type ?? 'unknown'}`,
+      })
     })
 
     es.addEventListener('done', () => {
@@ -268,7 +287,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
               {prUrl}
             </a>
           )}
-          <p className="mt-1 text-xs text-gray-500 font-mono">review/{reviewId}</p>
+          <p className="mt-1 text-xs text-gray-500 font-mono">
+            review/{reviewId}
+          </p>
         </div>
 
         {/* Status bar */}
@@ -335,7 +356,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm font-medium text-gray-100">{f.title}</p>
+                <p className="mt-2 text-sm font-medium text-gray-100">
+                  {f.title}
+                </p>
                 <p className="mt-1 text-sm text-gray-400">{f.body}</p>
 
                 {isEditing ? (
@@ -503,7 +526,9 @@ function PhaseRow({ label, status }: { label: string; status: PhaseStatus }) {
         {label}
       </span>
       {status === 'running' && (
-        <span className="ml-auto text-xs text-indigo-400 animate-pulse">running</span>
+        <span className="ml-auto text-xs text-indigo-400 animate-pulse">
+          running
+        </span>
       )}
       {status === 'done' && (
         <span className="ml-auto text-xs text-green-600">done</span>

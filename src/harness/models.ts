@@ -7,7 +7,7 @@ export interface Message {
   content: string
   toolCallId?: string
   toolName?: string
-  toolCalls?: ToolCall[]  // stored on assistant messages that made tool calls
+  toolCalls?: ToolCall[] // stored on assistant messages that made tool calls
 }
 
 export interface ToolDefinition {
@@ -167,8 +167,7 @@ export function createModelClient(
   } = {}
 ): ModelClient {
   const provider = options.provider ?? process.env.LLM_PROVIDER ?? 'anthropic'
-  const model =
-    options.model ?? process.env.LLM_MODEL ?? 'claude-sonnet-4-6'
+  const model = options.model ?? process.env.LLM_MODEL ?? 'claude-sonnet-4-6'
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY ?? ''
 
   if (provider === 'anthropic') {

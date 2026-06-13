@@ -1,15 +1,16 @@
 import { run } from '../../harness/loop'
 import { toToolDefinitions } from '../../harness/tools'
 import type { ReviewContext } from '../../harness/context'
-import type { ReviewEmitter } from './coordinator'
 import { EnrichedContextSchema, type EnrichedContext } from './schema'
 import { CONTEXT_AGENT_SYSTEM } from './prompts'
+
+type Emitter = (event: string, data: unknown) => void
 
 export interface ContextAgentOptions {
   prUrl: string
   reviewId: string
   context: ReviewContext
-  emit?: ReviewEmitter
+  emit?: Emitter
 }
 
 /**

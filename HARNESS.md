@@ -29,10 +29,12 @@ Browser → POST /api/review/start
 Guardrails enforce correctness and safety at two layers:
 
 **Input guardrails** — before the agents run:
+
 - PR size gate: warns when a PR exceeds `PR_MAX_FILES` (default 50) or `PR_MAX_LINES` (default 3000) — fires `PR_TOO_LARGE` alarm, agents still run but reviewer is informed
 - `prUrl` required — SSE stream returns `error` event immediately if absent
 
 **Tool dispatch guardrail** — during the agent loop:
+
 - Every tool call flows through `dispatch()` in `src/harness/tools.ts` — no agent calls a tool directly
 - `dispatch()` enforces an **allow-list**: unknown tool names return error-as-data, never execute
 - **Zod argument validation**: every tool has a typed `schema`; malformed args are rejected before the function is called
@@ -40,6 +42,7 @@ Guardrails enforce correctness and safety at two layers:
 - **Read-only enforcement**: GitHub and ticket tracker tools are read-only by construction. `post_review_comment` (the only write) is excluded from the agent registry — it only runs after the reviewer explicitly submits finalize with `postComment: true`
 
 **Output guardrails** — after agents produce findings:
+
 - `validateReviewOutput()` runs three checks on every `PRReview` before it reaches the UI:
   1. **Zod schema validation** — `PRReviewSchema.safeParse()` — rejects structurally invalid output
   2. **File citation check** — every finding must reference a file actually in the PR diff; hallucinated filenames fire `HALLUCINATED_FILE_CITATION` alarm and are stripped
@@ -54,13 +57,13 @@ Guardrails enforce correctness and safety at two layers:
 
 Every review runs through five named checkpoint stages. Each stage has a defined pass/fail criterion, persists its result to Supabase, and fires an alarm on failure.
 
-| Stage | What it checks | Pass criterion |
-|---|---|---|
-| `INPUT` | `prUrl` is present and well-formed | `Boolean(prUrl)` |
-| `CONTEXT` | Context Agent produced usable diff/files | `diff` non-empty OR `filesChanged.length > 0` |
-| `DOMAIN` | Each domain agent (correctness, security) completed | Agent returned a `DomainResult` without throwing |
-| `OUTPUT` | Final `PRReview` passes Zod schema | `PRReviewSchema.safeParse()` succeeds |
-| `FINALIZE` | Reviewer submitted decisions; memory store write attempted | Decisions present and non-empty |
+| Stage      | What it checks                                             | Pass criterion                                   |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| `INPUT`    | `prUrl` is present and well-formed                         | `Boolean(prUrl)`                                 |
+| `CONTEXT`  | Context Agent produced usable diff/files                   | `diff` non-empty OR `filesChanged.length > 0`    |
+| `DOMAIN`   | Each domain agent (correctness, security) completed        | Agent returned a `DomainResult` without throwing |
+| `OUTPUT`   | Final `PRReview` passes Zod schema                         | `PRReviewSchema.safeParse()` succeeds            |
+| `FINALIZE` | Reviewer submitted decisions; memory store write attempted | Decisions present and non-empty                  |
 
 **Implementation:**
 
@@ -72,7 +75,10 @@ await runCheckpoint({
   store: deps.checkpoints,
   check: async () => {
     const ctx = await runContextAgent({ prUrl, reviewId, context })
-    return { pass: Boolean(ctx.diff || ctx.filesChanged.length > 0), payload: ctx }
+    return {
+      pass: Boolean(ctx.diff || ctx.filesChanged.length > 0),
+      payload: ctx,
+    }
   },
 })
 ```
@@ -93,11 +99,12 @@ The checkpoint records give a complete audit trail: what each agent received as 
 **Tool registry pattern:**
 
 All tools share a single interface:
+
 ```typescript
 interface ToolEntry<TInput = unknown> {
-  fn: (input: any) => Promise<unknown>  // dispatch validates via Zod before calling
-  schema: z.ZodType<TInput>             // Zod schema for arg validation
-  description: string                   // passed verbatim to the model
+  fn: (input: any) => Promise<unknown> // dispatch validates via Zod before calling
+  schema: z.ZodType<TInput> // Zod schema for arg validation
+  description: string // passed verbatim to the model
 }
 ```
 
@@ -106,6 +113,7 @@ Tools are registered at startup in `createReviewContext()` via `buildRegistry()`
 **Typed tool definitions:** `toToolDefinitions()` converts `ToolRegistry` → `ToolDefinition[]` (the format the Anthropic API expects) by walking each tool's Zod schema. No manual JSON schema authoring.
 
 **Information flow:**
+
 1. Context Agent (full tool-calling loop) → `EnrichedContext` — assembles PR diff, changed files, ticket context, past review summaries
 2. `EnrichedContext` is passed verbatim to both domain agents — single source of truth, no re-fetching
 3. Domain agents return `DomainResult[]` → `mergeResults()` deduplicates by file+line proximity and applies a 0.9× confidence penalty to findings corroborated by only one agent
@@ -113,12 +121,12 @@ Tools are registered at startup in `createReviewContext()` via `buildRegistry()`
 
 **Pluggable by design:**
 
-| Layer | Default | Swap via |
-|---|---|---|
-| LLM | Anthropic Claude | `LLM_PROVIDER=openai` |
-| Ticket tracker | Linear | `TicketClient` interface |
-| Memory store | Supabase | `MEMORY_PROVIDER=sqlite` for CLI |
-| Git host | GitHub | `OctokitClient` interface |
+| Layer          | Default          | Swap via                         |
+| -------------- | ---------------- | -------------------------------- |
+| LLM            | Anthropic Claude | `LLM_PROVIDER=openai`            |
+| Ticket tracker | Linear           | `TicketClient` interface         |
+| Memory store   | Supabase         | `MEMORY_PROVIDER=sqlite` for CLI |
+| Git host       | GitHub           | `OctokitClient` interface        |
 
 No harness-core code imports from Anthropic, GitHub, or Supabase directly. All external dependencies are behind interfaces and injected via `createReviewContext()`.
 
@@ -131,10 +139,11 @@ No harness-core code imports from Anthropic, GitHub, or Supabase directly. All e
 Alarms are the observability backbone — named, structured alerts that fire at known risk points throughout the pipeline.
 
 **Alarm anatomy:**
+
 ```typescript
 interface Alarm {
-  type: AlarmType           // named enum — no magic strings
-  severity: AlarmSeverity   // LOW | MEDIUM | HIGH | CRITICAL
+  type: AlarmType // named enum — no magic strings
+  severity: AlarmSeverity // LOW | MEDIUM | HIGH | CRITICAL
   message: string
   context: Record<string, unknown>
   reviewId?: string
@@ -145,18 +154,18 @@ interface Alarm {
 
 **All alarm types with severity:**
 
-| AlarmType | Severity | Fires when |
-|---|---|---|
-| `TURN_LIMIT_EXCEEDED` | HIGH | Agent loop hit `maxTurns` without a final answer |
-| `TOKEN_LIMIT_EXCEEDED` | HIGH | Cumulative token count crossed `maxTokens` |
-| `TIMEOUT_EXCEEDED` | HIGH | Agent loop ran past `timeoutMs` |
-| `TOOL_TIMEOUT` | MEDIUM | Single tool call exceeded 30s |
-| `REPEATED_TOOL_CALL` | MEDIUM | Same tool called with identical args 3× in a row |
-| `CHECKPOINT_FAILED` | HIGH | A named pipeline stage produced a FAIL result |
-| `SCHEMA_VALIDATION_FAILED` | HIGH | Final output failed `PRReviewSchema.safeParse()` |
-| `HALLUCINATED_FILE_CITATION` | MEDIUM | Finding references a file not in the PR diff |
-| `SECRET_DETECTED` | CRITICAL | Credential-shaped string found in review output |
-| `PR_TOO_LARGE` | LOW | PR exceeded `PR_MAX_FILES` or `PR_MAX_LINES` thresholds |
+| AlarmType                    | Severity | Fires when                                              |
+| ---------------------------- | -------- | ------------------------------------------------------- |
+| `TURN_LIMIT_EXCEEDED`        | HIGH     | Agent loop hit `maxTurns` without a final answer        |
+| `TOKEN_LIMIT_EXCEEDED`       | HIGH     | Cumulative token count crossed `maxTokens`              |
+| `TIMEOUT_EXCEEDED`           | HIGH     | Agent loop ran past `timeoutMs`                         |
+| `TOOL_TIMEOUT`               | MEDIUM   | Single tool call exceeded 30s                           |
+| `REPEATED_TOOL_CALL`         | MEDIUM   | Same tool called with identical args 3× in a row        |
+| `CHECKPOINT_FAILED`          | HIGH     | A named pipeline stage produced a FAIL result           |
+| `SCHEMA_VALIDATION_FAILED`   | HIGH     | Final output failed `PRReviewSchema.safeParse()`        |
+| `HALLUCINATED_FILE_CITATION` | MEDIUM   | Finding references a file not in the PR diff            |
+| `SECRET_DETECTED`            | CRITICAL | Credential-shaped string found in review output         |
+| `PR_TOO_LARGE`               | LOW      | PR exceeded `PR_MAX_FILES` or `PR_MAX_LINES` thresholds |
 
 **Alarm delivery:** `fireAlarm()` writes structured JSON to `stderr` (always) and optionally calls a registered SSE emitter so the browser event log receives live alarm notifications. The SSE `alarm` event type is handled in `ReviewShell.tsx`.
 
