@@ -2,6 +2,54 @@
 
 ---
 
+# Session State — 2026-06-13 12:09
+
+## Context
+
+Gauntlet hackathon (Fired Festival). FIR-1 through FIR-6 are all complete and merged (or on branch ready to merge). FIR-8 is in progress on `ath/FIR-8/task-1`. Due 4:30 PM today.
+
+## Decisions Made
+
+- **In-process review cache** (`src/harness/review-cache.ts`): Module-level `Map<reviewId, PRReview>` with 1-hour TTL bridges the SSE route (where the review runs) and the finalize route (where the user submits decisions). Works on Railway single-instance. Alternative (Supabase-backed checkpoint) deferred — overkill for hackathon.
+- **Finalize route schema uses `action: ACCEPT|REJECT|EDIT`** (matches `FindingDecision` from `approval.ts`), NOT the old `accepted: boolean` stub. Updated accordingly.
+- **`/api/health` route added** for Railway health check ping.
+- **`railway.json` uses DOCKERFILE builder** with `buildArgs` forwarding `NEXT_PUBLIC_*` vars baked at build time. `next.config.ts` already had `output: "standalone"`.
+- **`post_review_comment` calls `octokit.issues.createComment`** (PR-level comment, not inline). Gated by `DRY_RUN=true`. Non-fatal failure on storeReview (logs, doesn't 500).
+
+## Tickets Touched
+
+- **FIR-5**: complete — Next.js web shell, Supabase SSR middleware, stub routes, approval UI
+- **FIR-6**: complete — all agent modules (prompts, context, correctness, security, merge, coordinator, approval), SSE wiring, tests, PR review fixes, CI fixes
+- **FIR-8**: in progress on `ath/FIR-8/task-1` — Dockerfile ✅, railway.json ✅, `/api/health` ✅, review-cache ✅, finalize wired ✅, start route E.1 (persist to Supabase) ⬜
+
+## What Was Tried and Abandoned
+
+- `emit('finding')` during domain agent `.then()` blocks: caused ID mismatch (pre-merge IDs). Moved to after `mergeResults()`.
+- `async check()` without `await` in coordinator checkpoints: ESLint `require-await` error. Fixed by removing `async` + returning `Promise.resolve()`.
+
+## Open Questions / Blockers
+
+- **E.1 (start route Supabase persist)**: Skipped for now — reviewId is only meaningful after review completes; the cache approach is sufficient for demo.
+- **Railway env vars**: Need to be set manually in Railway dashboard — `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LINEAR_API_KEY`.
+- **F.2 (create Railway project)**: User needs to do this manually via Railway dashboard or CLI.
+
+## Next Steps
+
+1. Finish FIR-8: push branch, create PR, merge — then set Railway env vars and verify auto-deploy
+2. Smoke test: `curl /api/health` on Railway URL; POST `/api/review/start` with demo PR URL
+3. **FIR-7**: end-to-end run against `python-adventofcode2020` PR #1, write `HARNESS.md`, record 5-min video
+
+## Key Files
+
+- `src/harness/review-cache.ts` — new: in-process PRReview cache (reviewId TTL Map)
+- `app/api/review/[id]/route.ts` — SSE route: calls `runReview`, caches result, emits `done`
+- `app/api/review/[id]/finalize/route.ts` — fully wired: loads cache, storeReview, optional post_review_comment
+- `app/api/health/route.ts` — new: Railway health check
+- `Dockerfile` — multi-stage Node 22 Alpine, standalone output, non-root user
+- `railway.json` — DOCKERFILE builder, health check path, restart policy
+
+---
+
 # Session State — 2026-06-13 10:47
 
 ## Context
