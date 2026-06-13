@@ -54,32 +54,35 @@ export async function GET(
       // rather than re-running the agents (handles page refresh / re-visits).
       const cached = getCachedReview(reviewId)
       if (cached) {
-        send('connected', { reviewId, prUrl, cached: true, message: 'Loaded from cache' })
-        send('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
-        send('checkpoint', { stage: 'CONTEXT', status: 'PASS', reviewId })
-        send('checkpoint', {
-          stage: 'DOMAIN',
-          agentName: 'correctness',
-          status: 'PASS',
-          reviewId,
-        })
-        send('checkpoint', {
-          stage: 'DOMAIN',
-          agentName: 'security',
-          status: 'PASS',
-          reviewId,
-        })
-        const allFindings = [
-          ...cached.review.blockingIssues,
-          ...cached.review.suggestions,
-          ...cached.review.nits,
-        ]
-        for (const finding of allFindings) {
-          send('finding', { finding })
+        try {
+          send('connected', { reviewId, prUrl, cached: true, message: 'Loaded from cache' })
+          send('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
+          send('checkpoint', { stage: 'CONTEXT', status: 'PASS', reviewId })
+          send('checkpoint', {
+            stage: 'DOMAIN',
+            agentName: 'correctness',
+            status: 'PASS',
+            reviewId,
+          })
+          send('checkpoint', {
+            stage: 'DOMAIN',
+            agentName: 'security',
+            status: 'PASS',
+            reviewId,
+          })
+          const allFindings = [
+            ...cached.review.blockingIssues,
+            ...cached.review.suggestions,
+            ...cached.review.nits,
+          ]
+          for (const finding of allFindings) {
+            send('finding', { finding })
+          }
+          send('checkpoint', { stage: 'OUTPUT', status: 'PASS', reviewId })
+          send('done', { reviewId })
+        } finally {
+          controller.close()
         }
-        send('checkpoint', { stage: 'OUTPUT', status: 'PASS', reviewId })
-        send('done', { reviewId })
-        controller.close()
         return
       }
 
