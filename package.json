@@ -1,0 +1,12 @@
+{
+  "name": "gauntlet-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A standalone, open-source CLI harness for AI-assisted PR review",
+  "scripts": {
+    "pdf": "./scripts/generate-pdf.sh"
+  },
+  "devDependencies": {
+    "md-to-pdf": "^5.2.5"
+  }
+}

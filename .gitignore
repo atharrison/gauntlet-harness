@@ -1,0 +1,7 @@
+.DS_Store
+.cursor/
+harness-screenshots/
+generated/
+reviews/
+node_modules/
+NOTES.md
