@@ -1,153 +1,95 @@
+/**
+ * OTel tracer setup for gauntlet-harness.
+ *
+ * Exports a singleton tracer and a `withSpan` helper for wrapping async
+ * operations in properly-nested spans.
+ *
+ * Exporter selection (checked at init time):
+ *   OTEL_EXPORTER_OTLP_ENDPOINT — if set, ship traces via OTLP HTTP
+ *   (otherwise) — ConsoleSpanExporter writes structured JSON to stdout,
+ *                 which is queryable in Railway log search.
+ *
+ * Call `initTracer()` once at process start (via instrumentation.ts).
+ * All other modules just import `withSpan` / `getTracer`.
+ */
+
 import {
   trace,
-  type Tracer,
-  type Span,
+  context,
   SpanStatusCode,
+  type Span,
+  type Tracer,
 } from '@opentelemetry/api'
-import type { ModelReply } from './models'
+import {
+  NodeTracerProvider,
+  BatchSpanProcessor,
+  SimpleSpanProcessor,
+  ConsoleSpanExporter,
+} from '@opentelemetry/sdk-trace-node'
 
-// ── Tracer singleton ──────────────────────────────────────────────────────────
+const SERVICE_NAME = 'gauntlet-harness'
+const TRACER_VERSION = '1.0.0'
 
-let _tracer: Tracer | null = null
+let _initialized = false
+
+export function initTracer(): void {
+  if (_initialized) return
+  _initialized = true
+
+  const provider = new NodeTracerProvider()
+
+  const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+
+  if (otlpEndpoint) {
+    // Dynamic import so the OTLP exporter doesn't add startup cost when unused
+    void import('@opentelemetry/exporter-trace-otlp-http').then(
+      ({ OTLPTraceExporter }) => {
+        provider.addSpanProcessor(
+          new BatchSpanProcessor(new OTLPTraceExporter({ url: otlpEndpoint }))
+        )
+        provider.register()
+        console.log(
+          JSON.stringify({
+            harness_otel_init: { exporter: 'otlp', endpoint: otlpEndpoint },
+          })
+        )
+      }
+    )
+  } else {
+    provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()))
+    provider.register()
+    console.log(
+      JSON.stringify({ harness_otel_init: { exporter: 'console' } })
+    )
+  }
+}
 
 export function getTracer(): Tracer {
-  if (!_tracer) {
-    _tracer = trace.getTracer('pr-review-harness', '0.1.0')
+  return trace.getTracer(SERVICE_NAME, TRACER_VERSION)
+}
+
+/**
+ * Run `fn` inside a named OTel span. Span is automatically ended and marked
+ * OK on success or ERROR on throw. Child spans created inside `fn` will
+ * automatically be parented to this span via context propagation.
+ */
+export async function withSpan<T>(
+  name: string,
+  attrs: Record<string, string | number | boolean>,
+  fn: (span: Span) => Promise<T>
+): Promise<T> {
+  const span = getTracer().startSpan(name, { attributes: attrs })
+  const ctx = trace.setSpan(context.active(), span)
+
+  try {
+    const result = await context.with(ctx, () => fn(span))
+    span.setStatus({ code: SpanStatusCode.OK })
+    return result
+  } catch (err) {
+    span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) })
+    span.recordException(err as Error)
+    throw err
+  } finally {
+    span.end()
   }
-  return _tracer
-}
-
-// ── Traced model call ─────────────────────────────────────────────────────────
-
-export async function tracedModelCall<T extends ModelReply>(
-  spanName: string,
-  fn: () => Promise<T>,
-  attrs: Record<string, string | number | boolean> = {}
-): Promise<T> {
-  return getTracer().startActiveSpan(spanName, async (span: Span) => {
-    try {
-      const reply = await fn()
-      span.setAttributes({
-        'llm.model': reply.model,
-        'llm.tokens_in': reply.usage.inputTokens,
-        'llm.tokens_out': reply.usage.outputTokens,
-        'llm.cost_usd': reply.cost,
-        ...attrs,
-      })
-      span.setStatus({ code: SpanStatusCode.OK })
-      return reply
-    } catch (e) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: String(e) })
-      span.recordException(e as Error)
-      throw e
-    } finally {
-      span.end()
-    }
-  })
-}
-
-// ── Traced tool call ──────────────────────────────────────────────────────────
-
-export async function tracedToolCall<T>(
-  toolName: string,
-  fn: () => Promise<T>
-): Promise<T> {
-  return getTracer().startActiveSpan(`tool.${toolName}`, async (span: Span) => {
-    span.setAttribute('tool.name', toolName)
-    try {
-      const result = await fn()
-      span.setStatus({ code: SpanStatusCode.OK })
-      return result
-    } catch (e) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: String(e) })
-      span.recordException(e as Error)
-      throw e
-    } finally {
-      span.end()
-    }
-  })
-}
-
-// ── Approval decision recording ───────────────────────────────────────────────
-// The approval loop is a natural instrumentation point — every decision is a
-// quality signal collected free, with zero extra labeling overhead.
-
-export function recordApprovalDecision(
-  findingId: string,
-  severity: string,
-  category: string,
-  action: 'ACCEPT' | 'REJECT' | 'EDIT'
-): void {
-  const span = getTracer().startSpan('review.finding.decision')
-  span.setAttributes({
-    'finding.id': findingId,
-    'finding.severity': severity,
-    'finding.category': category,
-    'finding.action': action,
-  })
-  span.setStatus({ code: SpanStatusCode.OK })
-  span.end()
-}
-
-// ── Review-level span ─────────────────────────────────────────────────────────
-
-export async function tracedReview<T>(
-  reviewId: string,
-  prUrl: string,
-  fn: () => Promise<T>
-): Promise<T> {
-  return getTracer().startActiveSpan('pr_review', async (span: Span) => {
-    span.setAttributes({
-      'review.id': reviewId,
-      'review.pr_url': prUrl,
-    })
-    try {
-      const result = await fn()
-      span.setStatus({ code: SpanStatusCode.OK })
-      return result
-    } catch (e) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: String(e) })
-      span.recordException(e as Error)
-      throw e
-    } finally {
-      span.end()
-    }
-  })
-}
-
-// ── Coverage helpers ──────────────────────────────────────────────────────────
-// Emitted by tool executors and rolled up into the pr_review span.
-
-export function recordFileCoverage(
-  span: Span,
-  filesRead: number,
-  filesInPr: number,
-  linesRead: number,
-  linesInPr: number,
-  externalContextCalls: number
-): void {
-  span.setAttributes({
-    'coverage.files_read': filesRead,
-    'coverage.files_in_pr': filesInPr,
-    'coverage.lines_read': linesRead,
-    'coverage.lines_in_pr': linesInPr,
-    'coverage.external_context_calls': externalContextCalls,
-  })
-}
-
-export function recordReviewQuality(
-  span: Span,
-  findingsAccepted: number,
-  findingsTotal: number,
-  findingsEdited: number,
-  ticketResolved: boolean
-): void {
-  span.setAttributes({
-    'quality.findings_accepted': findingsAccepted,
-    'quality.findings_total': findingsTotal,
-    'quality.findings_edited': findingsEdited,
-    'quality.ticket_resolved': ticketResolved,
-    'quality.acceptance_rate':
-      findingsTotal > 0 ? findingsAccepted / findingsTotal : 0,
-  })
 }
