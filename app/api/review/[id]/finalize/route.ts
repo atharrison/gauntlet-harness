@@ -64,6 +64,10 @@ export async function POST(
   const { review, prUrl } = cached
 
   // ── Mutual-exclusivity guards ─────────────────────────────────────────────
+  // totalFindings includes all severities (blocking + suggestions + nits),
+  // matching the UI's `total === 0` condition in ReviewShell which also counts
+  // all findings. Both gates are intentionally strict: the Approve CTA only
+  // appears and succeeds when the review is completely clean.
   const totalFindings =
     review.blockingIssues.length + review.suggestions.length + review.nits.length
 
@@ -76,9 +80,16 @@ export async function POST(
   }
 
   // Prevent the normal submission path from silently succeeding with no decisions.
+  // Error message is context-aware: if the review has no findings, guide caller
+  // toward approve:true; if it has findings, guide them to supply decisions.
   if (!approve && rawDecisions.length === 0) {
     return NextResponse.json(
-      { error: 'decisions must not be empty for a findings submission. Use approve:true for clean reviews.' },
+      {
+        error:
+          totalFindings === 0
+            ? 'This review has no findings. Use approve:true to post a clean LGTM.'
+            : 'decisions must not be empty for a findings submission.',
+      },
       { status: 400 }
     )
   }
@@ -86,6 +97,9 @@ export async function POST(
   // ── Two fully separate paths — approve (clean review) vs. submit (findings) ──
 
   const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+  if (!prUrlParts) {
+    console.warn(`[finalize/${reviewId}] prUrl could not be parsed — history metadata will be degraded. prUrl: ${prUrl}`)
+  }
   const memory = createMemoryStore()
 
   if (approve) {
@@ -133,7 +147,12 @@ export async function POST(
     }
 
     invalidateCachedReview(reviewId)
-    return NextResponse.json({ reviewId, status: 'approved', comment: commentResult })
+    return NextResponse.json({
+      reviewId,
+      status: 'approved',
+      comment: commentResult,
+      ...(prUrlParts ? {} : { warning: 'prUrl could not be parsed — history metadata stored with placeholder values' }),
+    })
   }
 
   // ── Submit path: build decision map, persist, post findings comment ────────
@@ -199,5 +218,6 @@ export async function POST(
     status: 'finalized',
     summary: { totalDecisions: rawDecisions.length, accepted, rejected },
     comment: commentResult,
+    ...(prUrlParts ? {} : { warning: 'prUrl could not be parsed — history metadata stored with placeholder values' }),
   })
 }
