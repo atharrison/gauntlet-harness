@@ -75,10 +75,11 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       store: deps.checkpoints,
       check: async () => {
         const ctx = await runContextAgent({ prUrl, reviewId, context })
+        const pass = Boolean(ctx.diff || ctx.filesChanged.length > 0)
         return {
-          pass: Boolean(ctx.diff || ctx.filesChanged.length > 0),
+          pass,
           payload: ctx,
-          error: 'Context agent returned empty diff and no files',
+          error: pass ? undefined : 'Context agent returned empty diff and no files',
         }
       },
     })
@@ -86,15 +87,15 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   }
 
   // ── Phase 2: Domain agents (parallel) ────────────────────────────────────
+  // Emit checkpoint events immediately; hold finding events until after merge
+  // so the IDs the client receives match the merged PRReview exactly.
   const [correctnessResult, securityResult] = await Promise.all([
     runCorrectnessAgent({ enrichedContext, model: deps.model }).then(r => {
       emit('checkpoint', { stage: 'DOMAIN', agentName: 'correctness', status: 'PASS', reviewId })
-      r.findings.forEach(f => emit('finding', { finding: f }))
       return r
     }),
     runSecurityAgent({ enrichedContext, model: deps.model }).then(r => {
       emit('checkpoint', { stage: 'DOMAIN', agentName: 'security', status: 'PASS', reviewId })
-      r.findings.forEach(f => emit('finding', { finding: f }))
       return r
     }),
   ])
@@ -102,6 +103,9 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   // ── Phase 3: Merge ────────────────────────────────────────────────────────
   const mergedFindings = mergeResults([correctnessResult, securityResult])
   const { blockingIssues, suggestions, nits } = bucketFindings(mergedFindings)
+
+  // Emit findings after merge so client IDs are stable and match the PRReview
+  mergedFindings.forEach(f => emit('finding', { finding: f }))
 
   // ── Phase 4: Coordinator summary ──────────────────────────────────────────
   const summaryRaw = await deps.model.chat(

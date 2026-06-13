@@ -62,8 +62,10 @@ export function toggleDecision(
 ): ApprovalState {
   const current = state.decisions[findingId]
   if (!current) return state
+  // Toggle between ACCEPT and REJECT only; EDIT is a separate explicit action
+  // and must not be clobbered by a checkbox click.
   const next: DecisionAction =
-    current.action === 'ACCEPT' ? 'REJECT' : 'ACCEPT'
+    current.action === 'REJECT' ? 'ACCEPT' : 'REJECT'
   return {
     ...state,
     decisions: {
@@ -93,7 +95,8 @@ export function editFinding(
 
 /**
  * Build the final ReviewSubmission from the current approval state.
- * Filters out REJECT decisions so only accepted/edited findings are included.
+ * All decisions (ACCEPT, REJECT, EDIT) are included — callers such as
+ * formatGitHubComment filter out REJECTs themselves.
  */
 export function buildSubmission(
   state: ApprovalState,

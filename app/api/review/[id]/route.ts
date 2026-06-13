@@ -21,7 +21,8 @@ export async function GET(
   const { id: reviewId } = await params;
   const { searchParams } = new URL(request.url);
   const prUrl = searchParams.get("prUrl") ?? "";
-  const mode = (searchParams.get("mode") ?? "full") as "full" | "quick";
+  const rawMode = searchParams.get("mode");
+  const mode: "full" | "quick" = rawMode === "quick" ? "quick" : "full";
 
   const encoder = new TextEncoder();
 

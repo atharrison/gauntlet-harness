@@ -69,6 +69,13 @@ describe('toggleDecision', () => {
     expect(after.decisions['n1'].action).toBe('ACCEPT')
   })
 
+  it('toggles EDIT → REJECT (does not promote back to ACCEPT)', () => {
+    let state = buildInitialState(review)
+    state = editFinding(state, 'b1', 'my fix')       // ACCEPT → EDIT
+    const after = toggleDecision(state, 'b1')         // EDIT → REJECT
+    expect(after.decisions['b1'].action).toBe('REJECT')
+  })
+
   it('returns state unchanged for unknown findingId', () => {
     const state = buildInitialState(review)
     const next = toggleDecision(state, 'nonexistent')
