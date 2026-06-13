@@ -90,8 +90,12 @@ function tryParseEnrichedContext(
   }
 
   // Graceful degradation: return a minimal context with whatever we have
+  const debugSuffix =
+    process.env.DEBUG_LLM === 'true'
+      ? ` Raw output (first 500 chars): ${text.slice(0, 500)}`
+      : ''
   console.warn(
-    `[context-agent][${reviewId}] Failed to parse EnrichedContext JSON — using minimal fallback. Raw output (first 500 chars): ${text.slice(0, 500)}`
+    `[context-agent][${reviewId}] Failed to parse EnrichedContext JSON — using minimal fallback.${debugSuffix}`
   )
   return {
     prUrl,

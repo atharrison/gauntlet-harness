@@ -30,7 +30,12 @@ export function cacheReview(
   review: PRReview,
   checkpoints: CachedCheckpoint[]
 ): void {
-  cache.set(reviewId, { review, prUrl, checkpoints, expiresAt: Date.now() + TTL_MS })
+  cache.set(reviewId, {
+    review,
+    prUrl,
+    checkpoints,
+    expiresAt: Date.now() + TTL_MS,
+  })
   // Opportunistically evict expired entries on each write
   const now = Date.now()
   for (const [id, entry] of Array.from(cache.entries())) {

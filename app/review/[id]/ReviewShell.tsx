@@ -133,7 +133,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       setStatus('running')
       addActivity({
         type: 'phase',
-        text: data.cached ? '⚡ Loaded from cache' : '⚡ Connected to review stream',
+        text: data.cached
+          ? '⚡ Loaded from cache'
+          : '⚡ Connected to review stream',
       })
       if (data.cached) setIsCachedReview(true)
     })

@@ -61,7 +61,12 @@ export async function GET(
       const cached = getCachedReview(reviewId)
       if (cached) {
         try {
-          send('connected', { reviewId, prUrl, cached: true, message: 'Loaded from cache' })
+          send('connected', {
+            reviewId,
+            prUrl,
+            cached: true,
+            message: 'Loaded from cache',
+          })
           // Replay the exact checkpoint sequence from the original run —
           // preserves agent count and order without hardcoding agent names.
           for (const cp of cached.checkpoints) {

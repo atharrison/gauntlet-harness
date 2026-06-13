@@ -122,6 +122,10 @@ Everything depends on this. Start here.
 
 > Single-user demo mode (no auth filtering). All reviews on the instance are visible.
 > `review_history` SQLite table is already populated on every `finalize`.
+>
+> ⚠️ **Do not deploy Phase 8 to a public URL until Phase 9 auth controls are in place.**
+> Phase 8 exposes all review records (PR diffs, findings, repo details) to any visitor.
+> Use Railway's private networking or an IP allowlist as a temporary gate if demoing externally.
 
 - [ ] **8.1** `GET /api/history` — list all `ReviewRecord` rows, newest first (limit 50)
 - [ ] **8.2** `/history` page — table of past reviews: repo, PR title, date, finding count, summary
@@ -155,6 +159,7 @@ Surface token usage, cost, per-phase timing, and alarms in both the browser UI a
 - [ ] **10.5** Show alarm badges in the pipeline sidebar (e.g. "⚠ 2 alarms" with severity color) — currently alarm events arrive but are only appended to the activity feed with no visual weight
 
 ---
+
 ## Reference
 
 ### Demo target
