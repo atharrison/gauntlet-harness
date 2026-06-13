@@ -111,8 +111,8 @@ export async function run(
       return { text: reply.text, turnsUsed: turn + 1, tokensUsed, totalCost }
     }
 
-    // Build assistant message with tool call marker
-    messages.push({ role: 'assistant', content: reply.text || '[tool calls]' })
+    // Build assistant message with tool_use blocks preserved for history
+    messages.push({ role: 'assistant', content: reply.text || '', toolCalls: reply.toolCalls })
 
     // Dispatch tool calls, check for repeat
     for (const call of reply.toolCalls) {

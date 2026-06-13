@@ -7,6 +7,7 @@ export interface Message {
   content: string
   toolCallId?: string
   toolName?: string
+  toolCalls?: ToolCall[]  // stored on assistant messages that made tool calls
 }
 
 export interface ToolDefinition {
@@ -91,11 +92,25 @@ export class AnthropicClient implements ModelClient {
             },
           ],
         })
-      } else if (m.role !== 'tool') {
-        allMessages.push({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })
+      } else if (m.role === 'assistant') {
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          // Must include tool_use blocks so subsequent tool_result messages are valid
+          const content: Anthropic.ContentBlockParam[] = []
+          if (m.content) content.push({ type: 'text', text: m.content })
+          for (const tc of m.toolCalls) {
+            content.push({
+              type: 'tool_use' as const,
+              id: tc.id,
+              name: tc.name,
+              input: tc.args,
+            })
+          }
+          allMessages.push({ role: 'assistant', content })
+        } else {
+          allMessages.push({ role: 'assistant', content: m.content })
+        }
+      } else if (m.role === 'user') {
+        allMessages.push({ role: 'user', content: m.content })
       }
     }
 
@@ -153,7 +168,7 @@ export function createModelClient(
 ): ModelClient {
   const provider = options.provider ?? process.env.LLM_PROVIDER ?? 'anthropic'
   const model =
-    options.model ?? process.env.LLM_MODEL ?? 'claude-3-5-sonnet-20241022'
+    options.model ?? process.env.LLM_MODEL ?? 'claude-sonnet-4-6'
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY ?? ''
 
   if (provider === 'anthropic') {
