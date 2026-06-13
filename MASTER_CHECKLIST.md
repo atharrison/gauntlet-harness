@@ -115,6 +115,7 @@ Everything depends on this. Start here.
 - [x] **7.3** Write `HARNESS.md` — required deliverable; maps working system to 4-pillar judges' vocabulary
 - [ ] **7.4** (bonus) Swap in second agent during demo to prove portability
 - [ ] **7.5** Record 5-min demo video
+- [ ] **7.6** Quick mode UI toggle — add "⚡ Quick mode" checkbox to home page submission form; passes `mode=quick` to the review start route; skips context agent, runs correctness+security only (~30s vs ~2min full run)
 
 ---
 
@@ -153,10 +154,11 @@ Everything depends on this. Start here.
 Surface token usage, cost, per-phase timing, and alarms in both the browser UI and Railway structured logs.
 
 - [ ] **10.1** Fix alarm SSE wiring — `setSseEmitter` is never called in the SSE route; alarms from `loop.ts` (TURN_LIMIT, TOKEN_BUDGET, REPEATED_TOOL_CALL) never reach the browser
-- [ ] **10.2** Emit `stats` SSE event at end of each fresh run: `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount }` — display in pipeline sidebar
-- [ ] **10.3** Add per-phase timing: record start/end timestamps for INPUT, CONTEXT, DOMAIN, OUTPUT in the coordinator; include in `stats` event
-- [ ] **10.4** Log a one-line JSON summary to stdout on run completion (Railway-friendly structured log): `{ reviewId, prUrl, tokensUsed, cost, durationMs, findings, alarms }`
+- [x] **10.2** Emit `stats` SSE event at end of each fresh run: `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount }` — display in pipeline sidebar
+- [x] **10.3** Add per-phase timing: record start/end timestamps for INPUT, CONTEXT, DOMAIN, OUTPUT in the coordinator; include in `stats` event
+- [x] **10.4** Log a one-line JSON summary to stdout on run completion (Railway-friendly structured log): `{ reviewId, prUrl, tokensUsed, cost, durationMs, findings, alarms }`
 - [ ] **10.5** Show alarm badges in the pipeline sidebar (e.g. "⚠ 2 alarms" with severity color) — currently alarm events arrive but are only appended to the activity feed with no visual weight
+- [x] **10.6** Wire OTel `NodeTracerProvider` — `src/harness/observability.ts` + `instrumentation.ts`; `ConsoleSpanExporter` default, OTLP HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` set; `harness.review` root span + phase child spans with token/cost/verdict attributes
 
 ---
 
@@ -182,6 +184,12 @@ Surface token usage, cost, per-phase timing, and alarms in both the browser UI a
 - PR: [#1](https://github.com/atharrison/python-adventofcode2020/pull/1) `ath/DAY-013/task-1` → `main`
 - Files: `day13/schedule.py`, `day13/day13.py`, `main.py`
 - Known smells planted: no type hints, debug prints, magic `'x'` string, undocumented coprime assumption, duplicate list filtering
+
+### Self-referential demo PR (7.6 quick mode + future demo)
+
+Review the harness reviewing itself — paste a PR against `gauntlet-harness` into the tool live on camera.
+Candidate: Phase 8 history stub (`GET /api/history` + `/history` page) — enough changed files to get
+real findings, but small enough to land quickly. "The snake eating its tail" moment for the video.
 
 ### Key files
 
