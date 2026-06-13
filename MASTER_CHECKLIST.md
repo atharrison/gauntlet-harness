@@ -160,6 +160,20 @@ Surface token usage, cost, per-phase timing, and alarms in both the browser UI a
 
 ---
 
+## 🤖 Phase 11 — Automated Review Triggers (post-Phase 8 feature request)
+
+> Requires Phase 8 (history) to be in place first. Reviews run automatically and queue up for human audit.
+
+- [ ] **11.1** `watched_repos` table — store list of repos the user wants auto-reviewed (repo URL, enabled flag, filter: all PRs / only open / only draft)
+- [ ] **11.2** Webhook receiver `POST /api/webhook/github` — validate GitHub HMAC signature, enqueue a review job on `pull_request.opened` and `pull_request.synchronize` events
+- [ ] **11.3** Background job runner — dequeue pending review jobs and run the full pipeline; persist results to `review_history` with `status: 'pending_audit'`
+- [ ] **11.4** "Inbox" view (`/inbox`) — list all auto-triggered reviews awaiting audit, sorted by opened date; badge count in header nav
+- [ ] **11.5** Audit flow — clicking an inbox item opens the normal `/review/{id}` approval UI; submitting marks the review `status: 'audited'`
+- [ ] **11.6** Add "Watch this repo" toggle to the home page PR submission form
+- [ ] **11.7** (stretch) Slack/email notification when a new auto-review lands in the inbox
+
+---
+
 ## Reference
 
 ### Demo target
