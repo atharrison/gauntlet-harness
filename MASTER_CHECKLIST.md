@@ -148,7 +148,7 @@ Everything depends on this. Start here.
 
 ---
 
-## 📊 Phase 10 — Observability · (post-demo feature request)
+## 📊 Phase 10 — Observability · [FIR-9](https://linear.app/atharrison/issue/FIR-9)
 
 Surface token usage, cost, per-phase timing, and alarms in both the browser UI and Railway structured logs.
 

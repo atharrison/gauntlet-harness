@@ -13,6 +13,12 @@ export interface ContextAgentOptions {
   emit?: Emitter
 }
 
+export interface ContextAgentResult {
+  context: EnrichedContext
+  tokensUsed: number
+  cost: number
+}
+
 /**
  * The Context Agent runs a full tool-calling loop against the PR.
  * It fetches the diff, ticket, past reviews, and synthesises them into
@@ -23,7 +29,7 @@ export interface ContextAgentOptions {
  */
 export async function runContextAgent(
   options: ContextAgentOptions
-): Promise<EnrichedContext> {
+): Promise<ContextAgentResult> {
   const { prUrl, reviewId, context, emit = () => {} } = options
   const { deps, registry, dispatcher } = context
 
@@ -47,7 +53,7 @@ Steps:
 4. Search past reviews with search_past_reviews for the most-changed files
 5. When done gathering, output your EnrichedContext JSON.`
 
-  const result = await run(userMessage, deps.model, tools, wrappedDispatch, {
+  const loopResult = await run(userMessage, deps.model, tools, wrappedDispatch, {
     maxTurns: 15,
     maxTokens: 150_000,
     timeoutMs: 120_000,
@@ -56,11 +62,15 @@ Steps:
   })
 
   // Parse the final JSON output
-  const parsed = tryParseEnrichedContext(result.text, prUrl, reviewId)
+  const parsed = tryParseEnrichedContext(loopResult.text, prUrl, reviewId)
 
   return {
-    ...parsed,
-    externalContextCalls: parsed.externalContextCalls + result.turnsUsed,
+    context: {
+      ...parsed,
+      externalContextCalls: parsed.externalContextCalls + loopResult.turnsUsed,
+    },
+    tokensUsed: loopResult.tokensUsed,
+    cost: loopResult.totalCost,
   }
 }
 

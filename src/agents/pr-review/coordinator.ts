@@ -35,7 +35,13 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   const { reviewId, prUrl, mode = 'full', context, emit = () => {} } = options
   const { deps } = context
 
+  const runStart = Date.now()
+  let totalTokens = 0
+  let totalCost = 0
+  const phaseDurations: Record<string, number> = {}
+
   // ── INPUT checkpoint ──────────────────────────────────────────────────────
+  const inputStart = Date.now()
   await runCheckpoint({
     reviewId,
     stage: 'INPUT',
@@ -48,9 +54,11 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       }),
   })
   emit('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
+  phaseDurations.INPUT = Date.now() - inputStart
 
   // ── Phase 1: Context Agent ────────────────────────────────────────────────
   let enrichedContext: EnrichedContext
+  const contextStart = Date.now()
 
   if (mode === 'quick') {
     // Minimal context from URL alone — skip the full agent loop
@@ -70,26 +78,31 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       externalContextCalls: 0,
     }
   } else {
-    enrichedContext = await runCheckpoint({
+    const ctxResult = await runCheckpoint({
       reviewId,
       stage: 'CONTEXT',
       store: deps.checkpoints,
       check: async () => {
-        const ctx = await runContextAgent({ prUrl, reviewId, context, emit })
-        const pass = Boolean(ctx.diff || ctx.filesChanged.length > 0)
+        const r = await runContextAgent({ prUrl, reviewId, context, emit })
+        const pass = Boolean(r.context.diff || r.context.filesChanged.length > 0)
         return {
           pass,
-          payload: ctx,
+          payload: r,
           error: pass
             ? undefined
             : 'Context agent returned empty diff and no files',
         }
       },
     })
+    enrichedContext = ctxResult.context
+    totalTokens += ctxResult.tokensUsed
+    totalCost += ctxResult.cost
     emit('checkpoint', { stage: 'CONTEXT', status: 'PASS', reviewId })
   }
+  phaseDurations.CONTEXT = Date.now() - contextStart
 
   // ── Phase 2: Domain agents (parallel) ────────────────────────────────────
+  const domainStart = Date.now()
   // Emit checkpoint events immediately; hold finding events until after merge
   // so the IDs the client receives match the merged PRReview exactly.
   const [correctnessResult, securityResult] = await Promise.all([
@@ -112,6 +125,8 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       return r
     }),
   ])
+  totalTokens += correctnessResult.tokensUsed + securityResult.tokensUsed
+  phaseDurations.DOMAIN = Date.now() - domainStart
 
   // ── Phase 3: Merge ────────────────────────────────────────────────────────
   const mergedFindings = mergeResults([correctnessResult, securityResult])
@@ -121,6 +136,7 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   mergedFindings.forEach(f => emit('finding', { finding: f }))
 
   // ── Phase 4: Coordinator summary ──────────────────────────────────────────
+  const outputStart = Date.now()
   const summaryRaw = await deps.model.chat(
     [
       {
@@ -133,6 +149,8 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
     ],
     []
   )
+  totalTokens += summaryRaw.usage.inputTokens + summaryRaw.usage.outputTokens
+  totalCost += summaryRaw.cost
 
   const summaryData = parseSummary(summaryRaw.text, enrichedContext)
 
@@ -166,9 +184,38 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       })
     },
   })
+  phaseDurations.OUTPUT = Date.now() - outputStart
+
+  const durationMs = Date.now() - runStart
+  const findingsCount = mergedFindings.length
+  const estimatedCostUsd = Math.round(totalCost * 10000) / 10000
+
+  // ── Emit observability stats ──────────────────────────────────────────────
+  emit('stats', {
+    tokensUsed: totalTokens,
+    estimatedCostUsd,
+    durationMs,
+    findingsCount,
+    phaseDurations,
+  })
 
   emit('checkpoint', { stage: 'OUTPUT', status: 'PASS', reviewId })
   emit('done', { reviewId })
+
+  // ── Structured completion log (Railway-friendly) ──────────────────────────
+  console.log(
+    JSON.stringify({
+      harness_run_complete: {
+        reviewId,
+        prUrl,
+        tokensUsed: totalTokens,
+        estimatedCostUsd,
+        durationMs,
+        findingsCount,
+        phaseDurations,
+      },
+    })
+  )
 
   return review
 }

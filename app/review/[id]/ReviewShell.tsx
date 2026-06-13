@@ -97,6 +97,13 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [elapsed, setElapsed] = useState(0)
   const [isCachedReview, setIsCachedReview] = useState(false)
+  const [runStats, setRunStats] = useState<{
+    tokensUsed: number
+    estimatedCostUsd: number
+    durationMs: number
+    findingsCount: number
+    phaseDurations: Record<string, number>
+  } | null>(null)
   const startTimeRef = useRef(Date.now())
   const domainDoneRef = useRef(0)
   const esRef = useRef<EventSource | null>(null)
@@ -211,6 +218,11 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       setElapsed(Date.now() - startTimeRef.current)
       addActivity({ type: 'phase', text: '🎉 Review complete' })
       es.close()
+    })
+
+    es.addEventListener('stats', e => {
+      const data = JSON.parse((e as MessageEvent).data)
+      setRunStats(data)
     })
 
     es.addEventListener('error', e => {
@@ -531,6 +543,35 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                 />
               ))}
             </div>
+            {runStats && (
+              <div className="mt-3 pt-3 border-t border-gray-800">
+                <p className="text-xs font-mono text-gray-500 tabular-nums">
+                  {runStats.tokensUsed.toLocaleString()} tokens
+                  {' · '}
+                  ${runStats.estimatedCostUsd.toFixed(4)}
+                  {' · '}
+                  {formatElapsed(runStats.durationMs)}
+                </p>
+                <div className="mt-1.5 space-y-0.5">
+                  {Object.entries(runStats.phaseDurations).map(([phase, ms]) => (
+                    <div key={phase} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 w-16">{phase}</span>
+                      <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 rounded-full"
+                          style={{
+                            width: `${Math.min(100, (ms / runStats.durationMs) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
+                        {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Activity feed */}
