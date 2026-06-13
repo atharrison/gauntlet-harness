@@ -73,9 +73,10 @@ function formatElapsed(ms: number): string {
 interface Props {
   reviewId: string
   prUrl: string
+  mode?: 'full' | 'quick'
 }
 
-export function ReviewShell({ reviewId, prUrl }: Props) {
+export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
   const [status, setStatus] = useState<StreamStatus>('connecting')
   const [findings, setFindings] = useState<Finding[]>([])
   const [decisions, setDecisions] = useState<Record<string, FindingDecision>>(
@@ -132,7 +133,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   useEffect(() => {
     const es = new EventSource(
-      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`
+      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}&mode=${mode}`
     )
     esRef.current = es
 
@@ -362,6 +363,11 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
         {/* Status bar */}
         <div className="mb-4 flex items-center gap-3">
           <StatusIndicator status={status} />
+          {mode === 'quick' && (
+            <span className="rounded-full bg-indigo-900/50 border border-indigo-700 px-2 py-0.5 text-xs font-semibold text-indigo-300">
+              ⚡ Quick
+            </span>
+          )}
           {status === 'done' && total > 0 && (
             <span className="text-sm text-gray-400">
               {total} finding{total !== 1 ? 's' : ''} — {accepted} accepted
@@ -557,13 +563,17 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
               </span>
             </div>
             <div className="space-y-2">
-              {PIPELINE.map(({ key, label }) => (
-                <PhaseRow
-                  key={key}
-                  label={label}
-                  status={phaseStatuses[key] ?? 'pending'}
-                />
-              ))}
+              {PIPELINE.map(({ key, label }) => {
+                const skipped = mode === 'quick' && key === 'CONTEXT'
+                return (
+                  <PhaseRow
+                    key={key}
+                    label={skipped ? `${label} (skipped)` : label}
+                    status={skipped ? 'pending' : (phaseStatuses[key] ?? 'pending')}
+                    dimmed={skipped}
+                  />
+                )
+              })}
             </div>
             {runStats && (
               <div className="mt-3 pt-3 border-t border-gray-800">
@@ -649,9 +659,17 @@ function StatusIndicator({ status }: { status: StreamStatus }) {
   )
 }
 
-function PhaseRow({ label, status }: { label: string; status: PhaseStatus }) {
+function PhaseRow({
+  label,
+  status,
+  dimmed = false,
+}: {
+  label: string
+  status: PhaseStatus
+  dimmed?: boolean
+}) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className={`flex items-center gap-2.5 ${dimmed ? 'opacity-35' : ''}`}>
       <PhaseIcon status={status} />
       <span
         className={`text-xs ${
