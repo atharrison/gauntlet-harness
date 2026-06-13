@@ -13,9 +13,12 @@ import type { PRReview } from '../agents/pr-review/schema'
 
 const TTL_MS = 60 * 60 * 1000 // 1 hour
 
+export type CachedCheckpoint = Record<string, unknown>
+
 interface CacheEntry {
   review: PRReview
   prUrl: string
+  checkpoints: CachedCheckpoint[]
   expiresAt: number
 }
 
@@ -24,9 +27,10 @@ const cache = new Map<string, CacheEntry>()
 export function cacheReview(
   reviewId: string,
   prUrl: string,
-  review: PRReview
+  review: PRReview,
+  checkpoints: CachedCheckpoint[]
 ): void {
-  cache.set(reviewId, { review, prUrl, expiresAt: Date.now() + TTL_MS })
+  cache.set(reviewId, { review, prUrl, checkpoints, expiresAt: Date.now() + TTL_MS })
   // Opportunistically evict expired entries on each write
   const now = Date.now()
   for (const [id, entry] of Array.from(cache.entries())) {

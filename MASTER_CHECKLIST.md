@@ -118,6 +118,42 @@ Everything depends on this. Start here.
 
 ---
 
+## 🗂 Phase 8 — Review History (post-demo feature requests)
+
+> Single-user demo mode (no auth filtering). All reviews on the instance are visible.
+> `review_history` SQLite table is already populated on every `finalize`.
+
+- [ ] **8.1** `GET /api/history` — list all `ReviewRecord` rows, newest first (limit 50)
+- [ ] **8.2** `/history` page — table of past reviews: repo, PR title, date, finding count, summary
+- [ ] **8.3** Link each row back to `/review/{id}` (cache replay if still warm, re-run if expired)
+- [ ] **8.4** Add "History" nav link to global header (`app/layout.tsx`)
+
+---
+
+## 🔐 Phase 9 — Authentication (post-demo feature requests)
+
+> Currently auth middleware is disabled for demo. Re-enabling requires schema changes.
+
+- [ ] **9.1** Add `user_id` column to `review_history` SQLite table (migration)
+- [ ] **9.2** Re-enable Supabase SSR auth middleware (`middleware.ts`) to protect `/review/*` and `/history`
+- [ ] **9.3** Filter `/api/history` results by authenticated user
+- [ ] **9.4** Associate finalized reviews with the logged-in user (pass user_id through finalize route)
+- [ ] **9.5** Login/logout UI in the header
+
+---
+
+## Phase 10 — Observability · (post-demo feature request)
+
+Surface token usage, cost, per-phase timing, and alarms in both the browser UI and Railway structured logs.
+
+- [ ] **10.1** Fix alarm SSE wiring — `setSseEmitter` is never called in the SSE route; alarms from `loop.ts` (TURN_LIMIT, TOKEN_BUDGET, REPEATED_TOOL_CALL) never reach the browser
+- [ ] **10.2** Emit `stats` SSE event at end of each fresh run: `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount }` — display in pipeline sidebar
+- [ ] **10.3** Add per-phase timing: record start/end timestamps for INPUT, CONTEXT, DOMAIN, OUTPUT in the coordinator; include in `stats` event
+- [ ] **10.4** Log a one-line JSON summary to stdout on run completion (Railway-friendly structured log): `{ reviewId, prUrl, tokensUsed, cost, durationMs, findings, alarms }`
+- [ ] **10.5** Show alarm badges in the pipeline sidebar (e.g. "⚠ 2 alarms" with severity color) — currently alarm events arrive but are only appended to the activity feed with no visual weight
+
+---
+
 ## Reference
 
 ### Demo target
