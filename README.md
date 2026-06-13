@@ -1,137 +1,177 @@
-# PR Review Agent
+# PR Review Harness
 
-**AI-assisted pull request review with human-in-the-loop approval.**
-Paste a PR URL, watch five specialized agents review it in parallel, then step
-through findings before anything reaches your team. Gets smarter with every
-review it runs — past reviews and team standards are injected as context automatically.
+**AI-powered pull request review with human-in-the-loop approval.**  
+Paste a GitHub PR URL, watch multiple specialized agents review it in parallel, then curate the findings before anything reaches your team. Gets smarter with every review — past reviews and team standards are injected as context automatically.
+
+Live: **https://gauntlet-review-harness.up.railway.app**
 
 ---
 
 ## How It Works
 
-**Web:** paste a PR URL, watch agents run, curate findings in the approval UI, submit to GitHub.
-
-**CLI:** same harness, same memory — an alternative interface for local workflows.
+Paste a PR URL. The harness runs a multi-agent pipeline, streams live progress to the browser, and presents findings as cards you can accept, reject, or edit inline. Once you submit, a structured comment posts to the GitHub PR.
 
 ```
-  Fetching PR #123 · branch: feat/ENG-456-add-payment-retry
-  Resolved ticket: ENG-456 — Add retry logic for failed payments
-  Reading 12 changed files ...
-
-  BLOCKING    PaymentService.ts:88
-              Retry loop has no backoff — will hammer the API on failure
-
-  SUGGESTION  auth/middleware.ts:44
-              Token expiry not checked before use
-
-  Web: checkbox findings, edit inline → Submit Review → GitHub PR
-  CLI: [A]ccept [R]eject [E]dit per finding → reviews/<ticket>_<date>.md
+Browser → POST /api/review/start
+        → GET  /api/review/[id]          (SSE stream — live agent progress)
+        → /review/[id]                   (approval UI — finding cards, inline edit)
+        → POST /api/review/[id]/finalize → Supabase history + GitHub PR comment
 ```
 
-For each changed file: **correctness · ticket alignment · security ·
-performance · test coverage · documentation.** All criteria live in user-configured
-memories — not hardcoded. Stack-specific rules added once, applied to every future review.
+**Full mode** (~2 min): Context Agent gathers PR diff, ticket, and past review context, then Correctness and Security agents run in parallel.
 
-Nothing reaches the PR author until you've approved it.
+**⚡ Quick mode** (~30s): skips the Context Agent, runs Correctness + Security directly on the raw diff, surfaces `BLOCKING` findings fast. Toggle on the home page.
 
 ---
 
 ## Architecture
 
 ```
-┌─ Memory Store ──────────────────────────────────────────────┐
-│  Code Index (v2)  │  Review History  │  Memories            │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
                     Context Agent
-                (full loop + tool calls)
-                           │  EnrichedContext
-       ┌───────────────────┼───────────────────┐
-       ▼       ▼           ▼         ▼          ▼
-    Style  Conventions Correctness Security Performance
-            (single-shot structured output · parallel)
-       └───────────────────┼───────────────────┘
-                           │  DomainResult[]
-                       Coordinator
-                  (dedup · calibrate · sort)
-                           │  PRReview (Zod-validated)
-                           ▼
-                 Approval UI → Supabase → GitHub PR
+               (full loop · up to 15 turns)
+          fetch diff → fetch files → fetch ticket → search memory
+                              │  EnrichedContext
+                 ┌────────────┴────────────┐
+                 ▼                         ▼
+        Correctness Agent          Security Agent
+        (single-shot)              (single-shot)
+        DomainResult               DomainResult
+                 └────────────┬────────────┘
+                              │
+                        mergeResults()
+                  dedup · confidence calibration
+                  BLOCKING → SUGGESTION → NIT sort
+                              │  PRReview (Zod-validated)
+                              ▼
+                  Coordinator summary call
+                              │
+                       Approval UI
+               accept / reject / edit per finding
+                              │
+                  finalize → Supabase + GitHub
 ```
 
-⚡ `--quick` mode: skips Context Agent, runs Correctness + Security only, surfaces BLOCKING findings in ~30 seconds.
+---
 
-**Loop:** Context Agent runs a full tool-call loop (build context → call model → run tool → append → repeat). Domain agents are single-shot structured output — no loop, predictable cost.
+## The Four Pillars
 
-**Tools:** `fetch_pr_diff` · `fetch_pr_files` · `fetch_ticket` · `search_past_reviews` · `search_codebase` · `store_review` · `create_memory` · `post_review_comment`
+### Guardrails (`src/harness/guardrails.ts`, `src/harness/tools.ts`)
 
-**Guardrails:** GitHub and ticket tracker are read-only. `post_review_comment` is the only write, gated behind the approval UI. File citation check, secret pattern scan, and scope-creep budget enforced on every run.
+- **Allow-list dispatch** — every tool call flows through `dispatch()`. Unknown tools return error-as-data, never execute.
+- **Zod argument validation** — malformed args are rejected before the function is called.
+- **Tool timeout** — each call is wrapped in `withTimeout()`, fires `TOOL_TIMEOUT` alarm after 30s.
+- **Read-only by construction** — GitHub/ticket tools are read-only. `post_review_comment` is the only write, gated behind explicit reviewer approval.
+- **Output integrity** — file citation check (hallucinated filenames stripped), secret pattern scan (fires `SECRET_DETECTED` alarm), Zod schema validation on every `PRReview`.
+
+### Checkpoints (`src/harness/checkpoints.ts`)
+
+Five named pipeline stages, each with a defined pass/fail criterion. Results persist to Supabase and fire alarms on failure.
+
+| Stage | Pass criterion |
+|---|---|
+| `INPUT` | `prUrl` present |
+| `CONTEXT` | diff non-empty or files changed |
+| `DOMAIN` | both domain agents returned without throwing |
+| `OUTPUT` | `PRReviewSchema.safeParse()` succeeds |
+| `FINALIZE` | decisions present and non-empty |
+
+### Material Handling (`src/harness/tools.ts`, `src/harness/context.ts`)
+
+All external dependencies are behind interfaces and injected via `createReviewContext()` — no harness-core code imports from Anthropic, GitHub, or Supabase directly.
+
+| Layer | Default | Swap via |
+|---|---|---|
+| LLM | Anthropic Claude | `ModelClient` interface |
+| Git host | GitHub | `OctokitClient` interface |
+| Ticket tracker | Linear | `TicketClient` interface |
+| Memory store | Supabase | `MEMORY_PROVIDER=sqlite` |
+
+### Alarms (`src/harness/alarms.ts`)
+
+Named, structured alerts that fire at known risk points. Delivered to `stderr` (structured JSON) and streamed to the browser via SSE.
+
+| Alarm | Severity |
+|---|---|
+| `TURN_LIMIT_EXCEEDED` | HIGH |
+| `TOKEN_BUDGET_EXCEEDED` | HIGH |
+| `TIMEOUT_EXCEEDED` | HIGH |
+| `TOOL_TIMEOUT` | MEDIUM |
+| `REPEATED_TOOL_CALL` | MEDIUM |
+| `CHECKPOINT_FAILED` | HIGH |
+| `HALLUCINATED_FILE_CITATION` | MEDIUM |
+| `SECRET_DETECTED` | CRITICAL |
+| `PR_TOO_LARGE` | LOW |
 
 ---
 
 ## Observability
 
-Signals designed for a review tool, not a generic agent harness.
+Every review emits a `stats` SSE event on completion — rendered live in the pipeline sidebar.
 
-| Group        | Key signals                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Coverage** | `files_read/files_in_pr` · `lines_read/lines_in_pr` · `external_context_calls`                                                |
-| **Cost**     | `$/review` · `tokens_from_context` vs `tokens_from_diff`                                                                      |
-| **Quality**  | `findings_accepted/total` · `findings_edited` · `ticket_resolved` — harvested free from the approval UI, no labeling required |
-| **Health**   | `turns_used/turns_max` · `tool_errors`                                                                                        |
-
-Instrumented with **OpenTelemetry** — export to any compatible backend.
+- **Token count + estimated cost** across all four pipeline phases
+- **Per-phase timing bars** (INPUT / CONTEXT / DOMAIN / OUTPUT)
+- **OpenTelemetry spans** — `harness.review` root span with child spans per phase, attributes: `tokens.total`, `cost.usd`, `findings.count`, `review.verdict`
+- **Structured stdout log** — `harness_run_complete` JSON line on every run (queryable in Railway)
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to Honeycomb, Jaeger, Datadog, etc.
 
 ---
 
-## Pluggable by Design
+## What's Shipped
 
-| Layer          | Default                | Swap via                                         |
-| -------------- | ---------------------- | ------------------------------------------------ |
-| LLM            | Anthropic Claude       | `LLM_PROVIDER=openai`                            |
-| Git host       | GitHub                 | GitLab _(planned)_                               |
-| Ticket tracker | Linear                 | `TicketClient` — Jira, GitHub Issues _(planned)_ |
-| Memory         | Supabase (team-shared) | `MEMORY_PROVIDER` env var                        |
-| Hosting        | Vercel + Next.js       | Any Node 20 host                                 |
+- [x] Multi-agent pipeline: Context + Correctness + Security agents
+- [x] Full mode and ⚡ Quick mode (UI toggle on home page)
+- [x] Live SSE activity feed + pipeline stage tracker
+- [x] Approval UI: accept / reject / inline edit per finding
+- [x] Submit findings + post comment to GitHub PR
+- [x] Approve PR (LGTM) for clean reviews with no findings
+- [x] Review cache — replay completed reviews instantly on page reload
+- [x] Supabase persistence: review history + checkpoints + memory
+- [x] OpenTelemetry trace spans + structured Railway logs
+- [x] Railway deployment with health check endpoint
 
-TypeScript up and down the stack. No stack assumptions in the harness core.
-MVP ships with GitHub + Linear. Works for any team, any repo.
+## What's Next
+
+- [ ] **Review history** (`/history` page) — browse past reviews, click to replay
+- [ ] **Authentication** — Supabase SSR auth to protect review data
+- [ ] **Automated triggers** — GitHub webhook receiver, auto-review on PR open/push
+- [ ] **Alarm badges** in pipeline sidebar (currently in activity feed only)
+- [ ] **Additional domain agents** — Style, Conventions, Performance (framework in place)
+- [ ] **Prometheus `/metrics` endpoint** — scrape-based metrics alongside OTel traces
 
 ---
 
 ## Getting Started
 
 ```bash
-# Web (Vercel)
-vercel deploy
+# Deployed
+open https://gauntlet-review-harness.up.railway.app
 
-# CLI
+# Local dev
+cp .env.example .env   # fill in required keys below
 npm install
-GITHUB_TOKEN=... LINEAR_API_KEY=... LLM_API_KEY=... \
-  npm run review -- https://github.com/org/repo/pull/123
+npm run dev
 
-# Quick mode
-npm run review -- --quick https://github.com/org/repo/pull/123
+# Tests
+npm test
 ```
 
 ### Environment variables
 
-| Variable            | Required    | Description                                    |
-| ------------------- | ----------- | ---------------------------------------------- |
-| `GITHUB_TOKEN`      | Yes         | GitHub personal access token (repo read scope) |
-| `LLM_API_KEY`       | Yes         | API key for your LLM provider                  |
-| `LLM_PROVIDER`      | No          | `anthropic` (default) · `openai`               |
-| `LLM_MODEL`         | No          | Model name (defaults to latest Claude)         |
-| `LINEAR_API_KEY`    | No          | Linear API key for ticket context              |
-| `TICKET_PROVIDER`   | No          | `linear` (default) · `jira` _(planned)_        |
-| `MEMORY_PROVIDER`   | No          | `supabase` (default) · `sqlite`                |
-| `SUPABASE_URL`      | If Supabase | Your Supabase project URL                      |
-| `SUPABASE_ANON_KEY` | If Supabase | Your Supabase anon key                         |
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
+| `GITHUB_TOKEN` | Yes | GitHub personal access token (repo read scope) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
+| `LINEAR_API_KEY` | No | Linear API key — ticket context degrades gracefully without it |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | Ship OTel traces to an external backend |
+| `DRY_RUN` | No | Set `true` to suppress all GitHub writes (safe for dev/demo) |
+| `DEBUG_LLM` | No | Set `true` to log raw LLM output on parse failures |
 
 ---
 
 ## Docs
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — full architecture with design rationale
-- [`docs/multi-agent-design.md`](docs/multi-agent-design.md) — schema contracts, execution modes, merge rules
-- [`docs/approval-ui.md`](docs/approval-ui.md) — web + CLI approval UX spec
+- [`HARNESS.md`](HARNESS.md) — four-pillar design doc (hackathon deliverable)
+- [`MASTER_CHECKLIST.md`](MASTER_CHECKLIST.md) — build day checklist + future roadmap
