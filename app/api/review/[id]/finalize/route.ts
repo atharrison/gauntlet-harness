@@ -69,7 +69,9 @@ export async function POST(
   // all findings. Both gates are intentionally strict: the Approve CTA only
   // appears and succeeds when the review is completely clean.
   const totalFindings =
-    review.blockingIssues.length + review.suggestions.length + review.nits.length
+    (review.blockingIssues?.length ?? 0) +
+    (review.suggestions?.length ?? 0) +
+    (review.nits?.length ?? 0)
 
   // Prevent a false LGTM comment being posted to a review that has findings.
   if (approve && totalFindings > 0) {
