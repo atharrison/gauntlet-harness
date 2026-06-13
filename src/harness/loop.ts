@@ -14,6 +14,7 @@ export interface LoopConfig {
   maxTokens?: number
   timeoutMs?: number
   reviewId?: string
+  systemPrompt?: string
 }
 
 export interface LoopResult {
@@ -95,7 +96,7 @@ export async function run(
     }
 
     // Model errors propagate to the caller — the loop does not swallow them
-    const reply: ModelReply = await model.chat(messages, tools)
+    const reply: ModelReply = await model.chat(messages, tools, config.systemPrompt)
 
     tokensUsed += reply.usage.inputTokens + reply.usage.outputTokens
     totalCost += reply.cost

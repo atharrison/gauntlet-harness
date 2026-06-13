@@ -6,3 +6,12 @@ node_modules/
 NOTES.md
 .env
 .env.local
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Next.js build output
+.next/
+
+# Test coverage artifacts
+coverage/
