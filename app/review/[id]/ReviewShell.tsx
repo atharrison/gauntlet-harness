@@ -479,17 +479,10 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               disabled={submitting}
-              onClick={() => handleSubmit(false)}
+              onClick={() => handleSubmit(true)}
               className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
             >
-              {submitting ? 'Submitting…' : `Submit (${accepted}/${total})`}
-            </button>
-            <button
-              disabled={submitting}
-              onClick={() => handleSubmit(true)}
-              className="rounded-lg border border-indigo-600 px-5 py-2.5 text-sm font-semibold text-indigo-400 hover:bg-indigo-950 disabled:opacity-50"
-            >
-              Submit + Post to GitHub
+              {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
             </button>
           </div>
         )}
@@ -499,17 +492,10 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               disabled={submitting}
-              onClick={() => handleApprove(false)}
+              onClick={() => handleApprove(true)}
               className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
             >
-              {submitting ? 'Approving…' : '✓ Approve PR'}
-            </button>
-            <button
-              disabled={submitting}
-              onClick={() => handleApprove(true)}
-              className="rounded-lg border border-green-600 px-5 py-2.5 text-sm font-semibold text-green-400 hover:bg-green-950 disabled:opacity-50"
-            >
-              ✓ Approve PR + Post to GitHub
+              {submitting ? 'Approving…' : '✓ Approve PR on GitHub'}
             </button>
           </div>
         )}
