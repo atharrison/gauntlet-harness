@@ -11,11 +11,15 @@ Repo: https://github.com/atharrison/gauntlet-harness
 
 Paste a GitHub PR URL. Multiple specialized agents review it in parallel. You curate the findings — accept, reject, or edit each one — before anything reaches your team. The system gets smarter with each review: past reviews and team standards are injected as context automatically.
 
+**Full mode** (~2 min): the Context Agent gathers the PR diff, ticket, and past review context before Correctness and Security agents run in parallel.
+
+**⚡ Quick mode** (~30s): toggle on the home page — skips the Context Agent, runs Correctness + Security directly on the raw diff, surfaces `BLOCKING` findings fast.
+
 ```
 Browser → POST /api/review/start
-       → GET  /api/review/[id]        (SSE stream — live agent progress)
-       → /review/[id]                 (approval UI — finding cards, checkbox, inline edit)
-       → POST /api/review/[id]/finalize → Supabase history + optional GitHub PR comment
+       → GET  /api/review/[id]        (SSE stream — live agent progress + stats)
+       → /review/[id]                 (approval UI — finding cards, inline edit, Approve CTA)
+       → POST /api/review/[id]/finalize → Supabase history + GitHub PR comment or approval
 ```
 
 ---
@@ -57,13 +61,13 @@ Guardrails enforce correctness and safety at two layers:
 
 Every review runs through five named checkpoint stages. Each stage has a defined pass/fail criterion, persists its result to Supabase, and fires an alarm on failure.
 
-| Stage      | What it checks                                             | Pass criterion                                   |
-| ---------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| `INPUT`    | `prUrl` is present and well-formed                         | `Boolean(prUrl)`                                 |
-| `CONTEXT`  | Context Agent produced usable diff/files                   | `diff` non-empty OR `filesChanged.length > 0`    |
-| `DOMAIN`   | Each domain agent (correctness, security) completed        | Agent returned a `DomainResult` without throwing |
-| `OUTPUT`   | Final `PRReview` passes Zod schema                         | `PRReviewSchema.safeParse()` succeeds            |
-| `FINALIZE` | Reviewer submitted decisions; memory store write attempted | Decisions present and non-empty                  |
+| Stage      | What it checks                                                     | Pass criterion                                   |
+| ---------- | ------------------------------------------------------------------ | ------------------------------------------------ |
+| `INPUT`    | `prUrl` is present and well-formed                                 | `Boolean(prUrl)`                                 |
+| `CONTEXT`  | Context Agent produced usable diff/files _(skipped in quick mode)_ | `diff` non-empty OR `filesChanged.length > 0`    |
+| `DOMAIN`   | Each domain agent (correctness, security) completed                | Agent returned a `DomainResult` without throwing |
+| `OUTPUT`   | Final `PRReview` passes Zod schema                                 | `PRReviewSchema.safeParse()` succeeds            |
+| `FINALIZE` | Reviewer submitted decisions; memory store write attempted         | Decisions present and non-empty                  |
 
 **Implementation:**
 
@@ -169,7 +173,7 @@ interface Alarm {
 
 **Alarm delivery:** `fireAlarm()` writes structured JSON to `stderr` (always) and optionally calls a registered SSE emitter so the browser event log receives live alarm notifications. The SSE `alarm` event type is handled in `ReviewShell.tsx`.
 
-**Instrumentation with OpenTelemetry:** every significant operation emits an OTel span via `tracedModelCall()` in `src/harness/observability.ts`. Signals tracked: `files_read/files_in_pr`, `$/review`, `findings_accepted/total`, `turns_used/turns_max`, `tool_errors`. These are designed to answer the questions a reviewer actually cares about — not generic agent telemetry.
+**Instrumentation with OpenTelemetry:** `src/harness/observability.ts` initialises a `NodeTracerProvider` via Next.js `instrumentation.ts`. Each review run produces a `harness.review` root span with child spans per pipeline phase. Attributes on the root span: `tokens.total`, `cost.usd`, `findings.count`, `duration.ms`, `review.verdict`. Phase spans carry phase-specific data: `tokens.context`, `tokens.correctness`, `tokens.security`, `files.changed`, `review.verdict`. A `stats` SSE event is emitted at run completion and rendered as a per-phase timing bar chart in the browser sidebar. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to any compatible backend; default is `ConsoleSpanExporter` (structured JSON to stdout, queryable in Railway logs).
 
 ---
 
@@ -201,7 +205,15 @@ interface Alarm {
               finalize → Supabase + GitHub
 ```
 
-**Quick mode** (`?mode=quick`): skips the Context Agent entirely, feeds the raw PR URL to Correctness + Security only, surfaces `BLOCKING` findings in ~30 seconds.
+**Quick mode** (`?mode=quick`): skips the Context Agent entirely, feeds the raw PR URL to Correctness + Security only, surfaces `BLOCKING` findings in ~30 seconds. Activated via the ⚡ Quick toggle on the home page.
+
+**Approval UI** — once the SSE stream reaches `done`:
+
+- Each finding card can be accepted, rejected, or edited inline
+- A per-phase timing bar chart and token/cost summary are shown in the sidebar
+- "Submit Review" posts findings with decisions to `/api/review/[id]/finalize`
+- "Approve PR" shortcut available when no blocking findings exist — posts a GitHub approval directly
+- After submission, a confirmation banner replaces the action buttons to prevent double-submit
 
 ---
 
@@ -216,7 +228,7 @@ src/
     guardrails.ts      — input/output integrity checks, secret scan
     loop.ts            — agent loop: maxTurns, maxTokens, timeoutMs hard stops
     models.ts          — ModelClient interface + Anthropic adapter
-    observability.ts   — OTel tracer, tracedModelCall(), coverage signals
+    observability.ts   — OTel tracer init, withSpan() helper, phase span attributes
     review-cache.ts    — in-process TTL Map bridges SSE route → finalize route
     tools.ts           — ToolRegistry, dispatch(), toToolDefinitions()
   agents/pr-review/
@@ -243,8 +255,9 @@ app/
     [id]/finalize/route.ts — store review, optional GitHub comment
   api/health/route.ts  — Railway health check
   review/[id]/
-    ReviewShell.tsx    — SSE client, finding cards, approval UI
+    ReviewShell.tsx    — SSE client, finding cards, approval UI, stats sidebar
 tests/                 — 100 passing (Jest + ts-jest)
+instrumentation.ts     — Next.js OTel init hook (nodejs runtime only)
 ```
 
 ---

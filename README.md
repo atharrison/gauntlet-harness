@@ -67,40 +67,40 @@ Browser → POST /api/review/start
 
 Five named pipeline stages, each with a defined pass/fail criterion. Results persist to Supabase and fire alarms on failure.
 
-| Stage | Pass criterion |
-|---|---|
-| `INPUT` | `prUrl` present |
-| `CONTEXT` | diff non-empty or files changed |
-| `DOMAIN` | both domain agents returned without throwing |
-| `OUTPUT` | `PRReviewSchema.safeParse()` succeeds |
-| `FINALIZE` | decisions present and non-empty |
+| Stage      | Pass criterion                               |
+| ---------- | -------------------------------------------- |
+| `INPUT`    | `prUrl` present                              |
+| `CONTEXT`  | diff non-empty or files changed              |
+| `DOMAIN`   | both domain agents returned without throwing |
+| `OUTPUT`   | `PRReviewSchema.safeParse()` succeeds        |
+| `FINALIZE` | decisions present and non-empty              |
 
 ### Material Handling (`src/harness/tools.ts`, `src/harness/context.ts`)
 
 All external dependencies are behind interfaces and injected via `createReviewContext()` — no harness-core code imports from Anthropic, GitHub, or Supabase directly.
 
-| Layer | Default | Swap via |
-|---|---|---|
-| LLM | Anthropic Claude | `ModelClient` interface |
-| Git host | GitHub | `OctokitClient` interface |
-| Ticket tracker | Linear | `TicketClient` interface |
-| Memory store | Supabase | `MEMORY_PROVIDER=sqlite` |
+| Layer          | Default          | Swap via                  |
+| -------------- | ---------------- | ------------------------- |
+| LLM            | Anthropic Claude | `ModelClient` interface   |
+| Git host       | GitHub           | `OctokitClient` interface |
+| Ticket tracker | Linear           | `TicketClient` interface  |
+| Memory store   | Supabase         | `MEMORY_PROVIDER=sqlite`  |
 
 ### Alarms (`src/harness/alarms.ts`)
 
 Named, structured alerts that fire at known risk points. Delivered to `stderr` (structured JSON) and streamed to the browser via SSE.
 
-| Alarm | Severity |
-|---|---|
-| `TURN_LIMIT_EXCEEDED` | HIGH |
-| `TOKEN_BUDGET_EXCEEDED` | HIGH |
-| `TIMEOUT_EXCEEDED` | HIGH |
-| `TOOL_TIMEOUT` | MEDIUM |
-| `REPEATED_TOOL_CALL` | MEDIUM |
-| `CHECKPOINT_FAILED` | HIGH |
-| `HALLUCINATED_FILE_CITATION` | MEDIUM |
-| `SECRET_DETECTED` | CRITICAL |
-| `PR_TOO_LARGE` | LOW |
+| Alarm                        | Severity |
+| ---------------------------- | -------- |
+| `TURN_LIMIT_EXCEEDED`        | HIGH     |
+| `TOKEN_BUDGET_EXCEEDED`      | HIGH     |
+| `TIMEOUT_EXCEEDED`           | HIGH     |
+| `TOOL_TIMEOUT`               | MEDIUM   |
+| `REPEATED_TOOL_CALL`         | MEDIUM   |
+| `CHECKPOINT_FAILED`          | HIGH     |
+| `HALLUCINATED_FILE_CITATION` | MEDIUM   |
+| `SECRET_DETECTED`            | CRITICAL |
+| `PR_TOO_LARGE`               | LOW      |
 
 ---
 
@@ -140,6 +140,26 @@ Every review emits a `stats` SSE event on completion — rendered live in the pi
 
 ---
 
+## Screenshots
+
+**Home page** — paste a PR URL, toggle Quick mode on/off:
+
+![Home page](docs/screenshots/01-home.png)
+
+**Review in progress** — BLOCKING / SUGGESTION / NIT findings with live pipeline stats (tokens, cost, per-phase timing):
+
+![Findings view](docs/screenshots/02-findings.png)
+
+**Inline edit** — curate a finding before it reaches your team:
+
+![Inline edit](docs/screenshots/03-inline-edit.png)
+
+**Clean review** — no findings in Quick mode, one-click GitHub approval:
+
+![Approve PR](docs/screenshots/04-approve.png)
+
+---
+
 ## Try It
 
 Not sure what to paste in? Use this sample PR — it's a Python Advent of Code solution with several real issues the harness is good at catching:
@@ -147,6 +167,7 @@ Not sure what to paste in? Use this sample PR — it's a Python Advent of Code s
 **[https://github.com/atharrison/python-adventofcode2020/pull/1](https://github.com/atharrison/python-adventofcode2020/pull/1)**
 
 What to expect from a full-mode review:
+
 - A `BLOCKING` finding on the CRT sieve in `day13.py` — `step *= n` is subtly wrong for non-coprime inputs; should be `lcm(step, n)`
 - A `BLOCKING` finding in `schedule.py` — no bounds check before `data[0]` / `data[1]`, crashes on malformed input
 - A `SUGGESTION` for unhandled empty bus list edge case in `solve_part1`
@@ -154,8 +175,6 @@ What to expect from a full-mode review:
 The harness picks these up without any hints — purely from reading the diff, the PR description, and reasoning about the algorithm.
 
 ---
-
-
 
 ```bash
 # Deployed
@@ -172,17 +191,17 @@ npm test
 
 ### Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
-| `GITHUB_TOKEN` | Yes | GitHub personal access token (repo read scope) |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
-| `LINEAR_API_KEY` | No | Linear API key — ticket context degrades gracefully without it |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | Ship OTel traces to an external backend |
-| `DRY_RUN` | No | Set `true` to suppress all GitHub writes (safe for dev/demo) |
-| `DEBUG_LLM` | No | Set `true` to log raw LLM output on parse failures |
+| Variable                               | Required | Description                                                    |
+| -------------------------------------- | -------- | -------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                    | Yes      | Anthropic API key                                              |
+| `GITHUB_TOKEN`                         | Yes      | GitHub personal access token (repo read scope)                 |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Yes      | Supabase project URL                                           |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes      | Supabase anon key                                              |
+| `SUPABASE_SERVICE_ROLE_KEY`            | Yes      | Supabase service role key                                      |
+| `LINEAR_API_KEY`                       | No       | Linear API key — ticket context degrades gracefully without it |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`          | No       | Ship OTel traces to an external backend                        |
+| `DRY_RUN`                              | No       | Set `true` to suppress all GitHub writes (safe for dev/demo)   |
+| `DEBUG_LLM`                            | No       | Set `true` to log raw LLM output on parse failures             |
 
 ---
 
