@@ -2,8 +2,8 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Install libc compatibility shim needed by some native modules on Alpine
-RUN apk add --no-cache libc6-compat
+# libc6-compat + build tools needed by better-sqlite3 (native C++ addon)
+RUN apk add --no-cache libc6-compat python3 make g++ sqlite-dev
 
 COPY package.json package-lock.json ./
 RUN npm ci
