@@ -21,7 +21,11 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
-export function cacheReview(reviewId: string, prUrl: string, review: PRReview): void {
+export function cacheReview(
+  reviewId: string,
+  prUrl: string,
+  review: PRReview
+): void {
   cache.set(reviewId, { review, prUrl, expiresAt: Date.now() + TTL_MS })
   // Opportunistically evict expired entries on each write
   const now = Date.now()

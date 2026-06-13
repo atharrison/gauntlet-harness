@@ -46,7 +46,13 @@ export async function GET(
 
       try {
         const context = createReviewContext()
-        const review = await runReview({ reviewId, prUrl, mode, context, emit: send })
+        const review = await runReview({
+          reviewId,
+          prUrl,
+          mode,
+          context,
+          emit: send,
+        })
         cacheReview(reviewId, prUrl, review)
         send('done', { reviewId })
       } catch (err) {

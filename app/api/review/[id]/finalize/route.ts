@@ -2,7 +2,10 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCachedReview } from '../../../../../src/harness/review-cache'
 import { createReviewContext } from '../../../../../src/harness/context'
-import { formatGitHubComment, buildSubmission } from '../../../../../src/agents/pr-review/approval'
+import {
+  formatGitHubComment,
+  buildSubmission,
+} from '../../../../../src/agents/pr-review/approval'
 import { createOctokit } from '../../../../../src/tools/github'
 import type { FindingDecision } from '../../../../../src/agents/pr-review/schema'
 
@@ -64,35 +67,46 @@ export async function POST(
     }
   }
 
-  const submission = buildSubmission({
-    reviewId,
-    decisions: decisionMap,
-    submitting: false,
-    submitted: true,
-    result: null,
-  }, postComment)
+  const submission = buildSubmission(
+    {
+      reviewId,
+      decisions: decisionMap,
+      submitting: false,
+      submitted: true,
+      result: null,
+    },
+    postComment
+  )
 
   // ── Persist to memory store ───────────────────────────────────────────────
   const { deps } = createReviewContext()
-  const allFindings = [...review.blockingIssues, ...review.suggestions, ...review.nits]
+  const allFindings = [
+    ...review.blockingIssues,
+    ...review.suggestions,
+    ...review.nits,
+  ]
   const accepted = rawDecisions.filter(d => d.action !== 'REJECT').length
   const rejected = rawDecisions.filter(d => d.action === 'REJECT').length
 
   const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
 
-  await deps.memory.storeReview(
-    { review, submission },
-    {
-      prUrl,
-      repoName: prUrlParts ? `${prUrlParts[1]}/${prUrlParts[2]}` : 'unknown/unknown',
-      prTitle: review.summary.slice(0, 80),
-      author: 'unknown',
-      prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
-    }
-  ).catch(err => {
-    // Non-fatal — log but don't fail the request
-    console.error('[finalize] storeReview failed:', err)
-  })
+  await deps.memory
+    .storeReview(
+      { review, submission },
+      {
+        prUrl,
+        repoName: prUrlParts
+          ? `${prUrlParts[1]}/${prUrlParts[2]}`
+          : 'unknown/unknown',
+        prTitle: review.summary.slice(0, 80),
+        author: 'unknown',
+        prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
+      }
+    )
+    .catch(err => {
+      // Non-fatal — log but don't fail the request
+      console.error('[finalize] storeReview failed:', err)
+    })
 
   // ── Optionally post GitHub comment ────────────────────────────────────────
   let commentResult: unknown = null
@@ -101,7 +115,10 @@ export async function POST(
     if (!octokit) {
       commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
     } else if (!prUrlParts) {
-      commentResult = { skipped: true, reason: 'Could not parse prUrl for GitHub API' }
+      commentResult = {
+        skipped: true,
+        reason: 'Could not parse prUrl for GitHub API',
+      }
     } else {
       const commentBody = formatGitHubComment(review, submission)
       const dryRun = process.env.DRY_RUN === 'true'
