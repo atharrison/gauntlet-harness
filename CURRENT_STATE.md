@@ -2,6 +2,57 @@
 
 ---
 
+# Session State — 2026-06-13 16:24
+
+## Context
+
+Gauntlet hackathon (Fired Festival) — **submission complete**. All FIR tickets through FIR-10 are merged to `main` and deployed to Railway. Demo video recorded. Project is in a clean, polished, demo-ready state.
+
+## Decisions Made
+
+- **OTel via `withSpan()` + phase spans**: Implemented `src/harness/observability.ts` with `NodeTracerProvider`, `withSpan()` helper, and `harness.review` root span + four child spans per phase. NOT `tracedModelCall()` — that was a design artifact that was never implemented. Default: `ConsoleSpanExporter`; set `OTEL_EXPORTER_OTLP_ENDPOINT` for external backend.
+- **Stats SSE event**: Coordinator emits `stats` event before `done` with `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount, phaseDurations }`. Rendered as per-phase timing bar chart + token/cost summary in ReviewShell sidebar.
+- **Cost tracking via `DomainResult.cost`**: Added `cost` field to `DomainResultSchema`; `parseDomainResult` in correctness/security agents forwards `reply.cost`; coordinator accumulates `totalCost` from all agents.
+- **Quick mode UI toggle**: Home page (`app/page.tsx`) converted to client component with `quickMode` state + custom CSS toggle. Passes `mode` param through start → SSE → finalize. UI shows `⚡ Quick` badge and dims/skips CONTEXT phase row.
+- **Screenshots in `docs/screenshots/`**: Four curated shots (home, findings, inline edit, approve) copied from Desktop and wired into README.
+- **HARNESS.md fixed**: Removed phantom `tracedModelCall()` references, documented actual OTel impl, noted quick mode skip in CONTEXT checkpoint, added Approval UI callout.
+
+## Tickets Touched
+
+- **FIR-9**: Phase 10 Observability — shipped and merged (PR #12). Fixed review comments: domain cost accumulation, stats SSE try/catch, phase bar division-by-zero guard, phaseDurations null guard, stale submitResult cleared on retry.
+- **FIR-10**: Quick Mode UI toggle — shipped and merged (PR #13). Home page toggle, mode prop threading, ⚡ badge, CONTEXT phase dimming.
+
+## What Was Tried and Abandoned
+
+- **`tracedModelCall()` / coverage signal names** (`files_read/files_in_pr` etc.): Was in the original design doc but never actually implemented. Stripped from HARNESS.md.
+- **Double-submit via `loading` state alone**: Was insufficient — added explicit `submitted` state that replaces buttons with confirmation banner after successful submit.
+
+## Open Questions / Blockers
+
+- Phase 10.1 (alarm SSE wiring) and 10.5 (alarm badges in sidebar) — still not shipped; in Activity feed only.
+- FIR-7 demo video: recorded by ~3:30 PM; not formally checked off in MASTER_CHECKLIST.
+
+## Next Steps (future work, not hackathon-blocked)
+
+1. Review history page (`/history`)
+2. Authentication (Supabase SSR auth)
+3. Automated GitHub webhook trigger
+4. Alarm badges in pipeline sidebar
+5. Additional domain agents (Style, Performance, Conventions)
+
+## Key Files
+
+- `HARNESS.md` — four-pillar design doc (hackathon deliverable); updated this session
+- `README.md` — updated with Screenshots section + accurate feature list
+- `docs/screenshots/` — four demo screenshots (01-home, 02-findings, 03-inline-edit, 04-approve)
+- `src/harness/observability.ts` — OTel tracer, `withSpan()` helper
+- `instrumentation.ts` — Next.js OTel init hook
+- `src/agents/pr-review/coordinator.ts` — stats SSE emit, phase spans, structured log
+- `app/page.tsx` — client component with Quick Mode toggle
+- `app/review/[id]/ReviewShell.tsx` — stats sidebar, submitted state, mode prop
+
+---
+
 # Session State — 2026-06-13 12:09
 
 ## Context
