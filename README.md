@@ -140,7 +140,22 @@ Every review emits a `stats` SSE event on completion — rendered live in the pi
 
 ---
 
-## Getting Started
+## Try It
+
+Not sure what to paste in? Use this sample PR — it's a Python Advent of Code solution with several real issues the harness is good at catching:
+
+**[https://github.com/atharrison/python-adventofcode2020/pull/1](https://github.com/atharrison/python-adventofcode2020/pull/1)**
+
+What to expect from a full-mode review:
+- A `BLOCKING` finding on the CRT sieve in `day13.py` — `step *= n` is subtly wrong for non-coprime inputs; should be `lcm(step, n)`
+- A `BLOCKING` finding in `schedule.py` — no bounds check before `data[0]` / `data[1]`, crashes on malformed input
+- A `SUGGESTION` for unhandled empty bus list edge case in `solve_part1`
+
+The harness picks these up without any hints — purely from reading the diff, the PR description, and reasoning about the algorithm.
+
+---
+
+
 
 ```bash
 # Deployed
