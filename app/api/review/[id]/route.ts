@@ -57,8 +57,8 @@ export async function GET(
           emit: send,
         })
         cacheReview(reviewId, prUrl, review)
-        send('done', { reviewId })
       } catch (err) {
+        console.error(`[review/${reviewId}] runReview failed:`, err)
         send('error', { error: String(err) })
         send('done', { reviewId })
       } finally {
