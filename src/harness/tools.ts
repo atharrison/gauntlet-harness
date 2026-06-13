@@ -8,7 +8,7 @@ export type ToolFn<TInput> = (input: TInput) => Promise<unknown>
 
 export interface ToolEntry<TInput = unknown> {
   // dispatch() always validates input via schema before calling fn, so any is safe here
-  fn: (input: any) => Promise<unknown> // eslint-disable-line @typescript-eslint/no-explicit-any
+  fn: (input: any) => Promise<unknown>
   schema: z.ZodType<TInput>
   description: string
 }

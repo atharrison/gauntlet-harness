@@ -92,7 +92,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     })
 
     es.addEventListener('error', e => {
-      const msg = e.data ? JSON.parse(e.data).error : 'Unknown error'
+      const msg = (e as MessageEvent).data
+        ? JSON.parse((e as MessageEvent).data).error
+        : 'Unknown error'
       setEvents(prev => [...prev, `Error: ${msg}`])
       setStatus('error')
     })
