@@ -123,7 +123,11 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     setSubmitting(true)
     try {
       const body = {
-        decisions: Object.values(decisions),
+        decisions: Object.values(decisions).map(d => ({
+          findingId: d.findingId,
+          action: d.accepted ? (d.editedText ? 'EDIT' : 'ACCEPT') : 'REJECT',
+          editedBody: d.editedText,
+        })),
         postComment,
       }
       const res = await fetch(`/api/review/${reviewId}/finalize`, {

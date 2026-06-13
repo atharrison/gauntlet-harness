@@ -3,6 +3,9 @@ import { createReviewContext } from '../../../../src/harness/context'
 import { runReview } from '../../../../src/agents/pr-review/coordinator'
 import { cacheReview } from '../../../../src/harness/review-cache'
 
+// Allow up to 5 minutes for the full multi-agent review pipeline
+export const maxDuration = 300
+
 /**
  * GET /api/review/[id]?prUrl=<encoded>&mode=full|quick
  * Server-Sent Events stream for live review progress.

@@ -168,7 +168,6 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
   })
 
   emit('checkpoint', { stage: 'OUTPUT', status: 'PASS', reviewId })
-  emit('done', { reviewId })
 
   return review
 }
