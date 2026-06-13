@@ -7,6 +7,7 @@ import {
 import { createMemoryStore } from '../../../../../src/memory/index'
 import {
   formatGitHubComment,
+  formatApprovalComment,
   buildSubmission,
 } from '../../../../../src/agents/pr-review/approval'
 import { createOctokit } from '../../../../../src/tools/github'
@@ -22,8 +23,9 @@ const FindingDecisionInput = z.object({
 })
 
 const FinalizeBody = z.object({
-  decisions: z.array(FindingDecisionInput).min(1),
+  decisions: z.array(FindingDecisionInput).default([]),
   postComment: z.boolean().default(false),
+  approve: z.boolean().default(false),
 })
 
 // ── POST /api/review/[id]/finalize ────────────────────────────────────────────
@@ -49,7 +51,7 @@ export async function POST(
     )
   }
 
-  const { decisions: rawDecisions, postComment } = parsed.data
+  const { decisions: rawDecisions, postComment, approve } = parsed.data
 
   // ── Load PRReview from in-process cache ───────────────────────────────────
   const cached = getCachedReview(reviewId)
@@ -120,7 +122,9 @@ export async function POST(
         reason: 'Could not parse prUrl for GitHub API',
       }
     } else {
-      const commentBody = formatGitHubComment(review, submission)
+      const commentBody = approve
+        ? formatApprovalComment(review)
+        : formatGitHubComment(review, submission)
       const dryRun = process.env.DRY_RUN === 'true'
       if (dryRun) {
         commentResult = { dryRun: true, body: commentBody }

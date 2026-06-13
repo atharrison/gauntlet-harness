@@ -292,6 +292,28 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     }
   }
 
+  async function handleApprove(postComment: boolean) {
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/review/${reviewId}/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisions: [], postComment, approve: true }),
+      })
+      const data = await res.json()
+      setSubmitResult(
+        res.ok
+          ? postComment
+            ? '✓ Approved — LGTM comment posted to GitHub'
+            : '✓ Marked as approved'
+          : `Error: ${data.error}`
+      )
+    } catch {
+      setSubmitResult('Error: unexpected server response')
+    } finally {
+      setSubmitting(false)
+    }
+  }
   const accepted = Object.values(decisions).filter(d => d.accepted).length
   const total = findings.length
 
@@ -468,6 +490,26 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
               className="rounded-lg border border-indigo-600 px-5 py-2.5 text-sm font-semibold text-indigo-400 hover:bg-indigo-950 disabled:opacity-50"
             >
               Submit + Post to GitHub
+            </button>
+          </div>
+        )}
+
+        {/* Clean review: no findings → Approve CTA */}
+        {status === 'done' && total === 0 && (
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              disabled={submitting}
+              onClick={() => handleApprove(false)}
+              className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+            >
+              {submitting ? 'Approving…' : '✓ Approve PR'}
+            </button>
+            <button
+              disabled={submitting}
+              onClick={() => handleApprove(true)}
+              className="rounded-lg border border-green-600 px-5 py-2.5 text-sm font-semibold text-green-400 hover:bg-green-950 disabled:opacity-50"
+            >
+              ✓ Approve PR + Post to GitHub
             </button>
           </div>
         )}
