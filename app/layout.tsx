@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -16,9 +17,12 @@ export default function RootLayout({
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
         <header className="border-b border-gray-800 bg-gray-900 px-6 py-4">
           <div className="mx-auto flex max-w-6xl items-center gap-3">
-            <span className="text-xl font-semibold tracking-tight">
+            <Link
+              href="/"
+              className="text-xl font-semibold tracking-tight hover:text-indigo-300 transition-colors"
+            >
               PR Review Harness
-            </span>
+            </Link>
             <span className="rounded bg-indigo-900 px-2 py-0.5 text-xs font-medium text-indigo-300">
               BETA
             </span>
