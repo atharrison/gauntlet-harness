@@ -127,9 +127,14 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     )
     esRef.current = es
 
-    es.addEventListener('connected', () => {
+    es.addEventListener('connected', e => {
+      const data = JSON.parse((e as MessageEvent).data ?? '{}')
       setStatus('running')
-      addActivity({ type: 'phase', text: '⚡ Connected to review stream' })
+      addActivity({
+        type: 'phase',
+        text: data.cached ? '⚡ Loaded from cache' : '⚡ Connected to review stream',
+      })
+      if (data.cached) startTimeRef.current = Date.now() // reset so elapsed reads 0
     })
 
     es.addEventListener('checkpoint', e => {

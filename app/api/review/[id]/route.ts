@@ -1,7 +1,10 @@
 import { type NextRequest } from 'next/server'
 import { createReviewContext } from '../../../../src/harness/context'
 import { runReview } from '../../../../src/agents/pr-review/coordinator'
-import { cacheReview } from '../../../../src/harness/review-cache'
+import {
+  cacheReview,
+  getCachedReview,
+} from '../../../../src/harness/review-cache'
 
 // Allow up to 5 minutes for the full multi-agent review pipeline
 export const maxDuration = 300
@@ -42,6 +45,39 @@ export async function GET(
 
       if (!prUrl) {
         send('error', { error: 'prUrl query param is required' })
+        send('done', { reviewId })
+        controller.close()
+        return
+      }
+
+      // If this review was already completed, replay from cache instantly
+      // rather than re-running the agents (handles page refresh / re-visits).
+      const cached = getCachedReview(reviewId)
+      if (cached) {
+        send('connected', { reviewId, prUrl, cached: true, message: 'Loaded from cache' })
+        send('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
+        send('checkpoint', { stage: 'CONTEXT', status: 'PASS', reviewId })
+        send('checkpoint', {
+          stage: 'DOMAIN',
+          agentName: 'correctness',
+          status: 'PASS',
+          reviewId,
+        })
+        send('checkpoint', {
+          stage: 'DOMAIN',
+          agentName: 'security',
+          status: 'PASS',
+          reviewId,
+        })
+        const allFindings = [
+          ...cached.review.blockingIssues,
+          ...cached.review.suggestions,
+          ...cached.review.nits,
+        ]
+        for (const finding of allFindings) {
+          send('finding', { finding })
+        }
+        send('checkpoint', { stage: 'OUTPUT', status: 'PASS', reviewId })
         send('done', { reviewId })
         controller.close()
         return
