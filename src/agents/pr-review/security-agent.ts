@@ -77,8 +77,12 @@ function parseDomainResult(
     }
   }
 
+  const debugSuffix =
+    process.env.DEBUG_LLM === 'true'
+      ? ` Raw output (first 500 chars): ${text.slice(0, 500)}`
+      : ''
   console.warn(
-    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON`
+    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON.${debugSuffix}`
   )
   return {
     domain,

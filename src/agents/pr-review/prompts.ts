@@ -28,21 +28,22 @@ agents will use.
 4. When you have enough context, output your final answer as a JSON object.
 
 ## Output format
-Output ONLY a raw JSON object (no markdown fences) matching this shape:
+Output ONLY a raw JSON object — no markdown fences, no explanation, just the JSON.
+Use exactly this shape:
 {
-  "prUrl": string,
-  "prTitle": string,
-  "prAuthor": string,
-  "prBranch": string,
-  "diff": string,
-  "filesChanged": string[],
-  "fileCoverage": [{ "file": string, "status": "READ"|"SKIPPED"|"TRUNCATED" }],
-  "ticketId": string | null,
-  "ticketSummary": string | null,
-  "ticketAcceptanceCriteria": string[],
-  "pastReviewSummaries": string[],
-  "memories": string[],
-  "externalContextCalls": number
+  "prUrl": "<url string>",
+  "prTitle": "<string>",
+  "prAuthor": "<string>",
+  "prBranch": "<string>",
+  "diff": "<full unified diff as a string>",
+  "filesChanged": ["<filename>", ...],
+  "fileCoverage": [{ "file": "<filename>", "status": "READ" }],
+  "ticketId": "<string or omit if none>",
+  "ticketSummary": "<string or omit if none>",
+  "ticketAcceptanceCriteria": ["<string>", ...],
+  "pastReviewSummaries": ["<string>", ...],
+  "memories": [],
+  "externalContextCalls": 0
 }
 
 Do not include any text before or after the JSON object.`
@@ -53,7 +54,7 @@ export const CORRECTNESS_SYSTEM = `You are a senior software engineer performing
 
 Focus exclusively on:
 - Logic errors and off-by-one mistakes
-- Null/undefined dereferences and missing error handling  
+- Null/undefined dereferences and missing error handling
 - Edge cases that are not covered
 - Incorrect algorithm or data structure choices
 - Acceptance criteria from the ticket that are NOT implemented
@@ -71,28 +72,33 @@ export function correctnessUserPrompt(contextJson: string): string {
 ${contextJson}
 
 ## Output format
-Output ONLY a raw JSON object (no markdown fences):
+Output ONLY a raw JSON object — no markdown fences, no explanation before or after.
 {
   "domain": "CORRECTNESS",
   "findings": [
     {
-      "id": "<uuid>",
-      "severity": "BLOCKING"|"SUGGESTION"|"NIT",
+      "id": "generate-a-uuid-here",
+      "severity": "BLOCKING",
       "category": "CORRECTNESS",
-      "file": "<filename>",
-      "line": <number or null>,
-      "title": "<one-line summary>",
-      "body": "<detailed explanation with evidence from the code>",
-      "confidence": <0.0-1.0>,
-      "suggestedFix": "<optional fix>"
+      "file": "path/to/file.ts",
+      "line": 42,
+      "title": "one-line summary of the issue",
+      "body": "detailed explanation with evidence from the code",
+      "confidence": 0.85,
+      "suggestedFix": "optional suggested fix — omit field entirely if none"
     }
   ],
-  "confidence": <overall 0.0-1.0>,
-  "tokensUsed": 0,
-  "durationMs": 0
+  "confidence": 0.8
 }
 
-Only include findings with confidence >= 0.7. If no issues found, return "findings": [].`
+Notes:
+- severity must be exactly one of: BLOCKING, SUGGESTION, or NIT
+- line must be an integer — omit the field entirely if unknown
+- suggestedFix is optional — omit the field entirely if you have no fix
+- confidence is a number between 0.0 and 1.0
+- Only include findings with confidence >= 0.7
+- If no issues found, use "findings": []
+- tokensUsed and durationMs will be filled in by the system — do not include them`
 }
 
 // ── Security Agent ────────────────────────────────────────────────────────────
@@ -119,28 +125,33 @@ export function securityUserPrompt(contextJson: string): string {
 ${contextJson}
 
 ## Output format
-Output ONLY a raw JSON object (no markdown fences):
+Output ONLY a raw JSON object — no markdown fences, no explanation before or after.
 {
   "domain": "SECURITY",
   "findings": [
     {
-      "id": "<uuid>",
-      "severity": "BLOCKING"|"SUGGESTION"|"NIT",
+      "id": "generate-a-uuid-here",
+      "severity": "SUGGESTION",
       "category": "SECURITY",
-      "file": "<filename>",
-      "line": <number or null>,
-      "title": "<one-line summary>",
-      "body": "<detailed explanation with evidence from the code>",
-      "confidence": <0.0-1.0>,
-      "suggestedFix": "<optional fix>"
+      "file": "path/to/file.ts",
+      "line": 42,
+      "title": "one-line summary of the vulnerability",
+      "body": "detailed explanation with evidence from the code",
+      "confidence": 0.85,
+      "suggestedFix": "optional suggested fix — omit field entirely if none"
     }
   ],
-  "confidence": <overall 0.0-1.0>,
-  "tokensUsed": 0,
-  "durationMs": 0
+  "confidence": 0.8
 }
 
-Only include findings with confidence >= 0.7. If no issues found, return "findings": [].`
+Notes:
+- severity must be exactly one of: BLOCKING, SUGGESTION, or NIT
+- line must be an integer — omit the field entirely if unknown
+- suggestedFix is optional — omit the field entirely if you have no fix
+- confidence is a number between 0.0 and 1.0
+- Only include findings with confidence >= 0.7
+- If no issues found, use "findings": []
+- tokensUsed and durationMs will be filled in by the system — do not include them`
 }
 
 // ── Coordinator ───────────────────────────────────────────────────────────────
@@ -157,16 +168,21 @@ ${contextJson}
 ## Merged Findings
 ${findingsJson}
 
-Output ONLY a raw JSON object:
+Output ONLY a raw JSON object — no markdown fences, no explanation before or after.
 {
-  "summary": "<2-3 sentence overview of the PR and its quality>",
-  "whatLooksGood": ["<positive observation>"],
-  "questions": ["<clarifying question for the author>"],
-  "testingRecommendations": ["<specific test scenario>"],
-  "verdict": "APPROVE"|"REQUEST_CHANGES"|"COMMENT",
-  "verdictSummary": "<1-2 sentence verdict explanation>",
+  "summary": "2-3 sentence overview of the PR and its quality",
+  "whatLooksGood": ["positive observation"],
+  "questions": ["clarifying question for the author"],
+  "testingRecommendations": ["specific test scenario"],
+  "verdict": "COMMENT",
+  "verdictSummary": "1-2 sentence verdict explanation",
   "ticketAlignment": [
-    { "requirement": "<AC item>", "met": true|false, "location": "<file/function or null>" }
+    { "requirement": "AC item text", "met": true, "location": "file/function or omit if not applicable" }
   ]
-}`
+}
+
+Notes:
+- verdict must be exactly one of: APPROVE, REQUEST_CHANGES, or COMMENT
+- met must be exactly true or false (boolean, not a string)
+- All array fields should be empty arrays if not applicable, never omitted`
 }

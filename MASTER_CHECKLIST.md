@@ -122,6 +122,10 @@ Everything depends on this. Start here.
 
 > Single-user demo mode (no auth filtering). All reviews on the instance are visible.
 > `review_history` SQLite table is already populated on every `finalize`.
+>
+> ⚠️ **Do not deploy Phase 8 to a public URL until Phase 9 auth controls are in place.**
+> Phase 8 exposes all review records (PR diffs, findings, repo details) to any visitor.
+> Use Railway's private networking or an IP allowlist as a temporary gate if demoing externally.
 
 - [ ] **8.1** `GET /api/history` — list all `ReviewRecord` rows, newest first (limit 50)
 - [ ] **8.2** `/history` page — table of past reviews: repo, PR title, date, finding count, summary
@@ -139,6 +143,8 @@ Everything depends on this. Start here.
 - [ ] **9.3** Filter `/api/history` results by authenticated user
 - [ ] **9.4** Associate finalized reviews with the logged-in user (pass user_id through finalize route)
 - [ ] **9.5** Login/logout UI in the header
+
+---
 
 ---
 
