@@ -8,10 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest",
+    "test": "jest --testPathIgnorePatterns=tests/integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:integration": "dotenvx run -- jest --testPathPattern=tests/integration",
     "review": "ts-node --esm src/cli/index.ts",
     "pdf": "./scripts/generate-pdf.sh"
   },
@@ -32,6 +32,7 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^1.71.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.19.0",

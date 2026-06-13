@@ -59,7 +59,7 @@ const SCHEMA_SQL = `
     message TEXT,
     payload JSONB,
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (review_id, stage, agent_name)
+    UNIQUE NULLS NOT DISTINCT (review_id, stage, agent_name)
   );
 
   CREATE INDEX IF NOT EXISTS review_checkpoints_review_idx ON review_checkpoints (review_id);
