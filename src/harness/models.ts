@@ -148,10 +148,11 @@ export function createModelClient(options: {
   provider?: string
   model?: string
   apiKey?: string
-}): ModelClient {
-  const provider = options.provider ?? 'anthropic'
-  const model = options.model ?? 'claude-3-5-sonnet-20241022'
-  const apiKey = options.apiKey ?? ''
+} = {}): ModelClient {
+  const provider = options.provider ?? process.env.LLM_PROVIDER ?? 'anthropic'
+  const model =
+    options.model ?? process.env.LLM_MODEL ?? 'claude-3-5-sonnet-20241022'
+  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY ?? ''
 
   if (provider === 'anthropic') {
     if (!apiKey)

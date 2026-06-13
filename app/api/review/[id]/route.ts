@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { createReviewContext } from '../../../../src/harness/context'
 import { runReview } from '../../../../src/agents/pr-review/coordinator'
+import { cacheReview } from '../../../../src/harness/review-cache'
 
 /**
  * GET /api/review/[id]?prUrl=<encoded>&mode=full|quick
@@ -45,7 +46,9 @@ export async function GET(
 
       try {
         const context = createReviewContext()
-        await runReview({ reviewId, prUrl, mode, context, emit: send })
+        const review = await runReview({ reviewId, prUrl, mode, context, emit: send })
+        cacheReview(reviewId, prUrl, review)
+        send('done', { reviewId })
       } catch (err) {
         send('error', { error: String(err) })
         send('done', { reviewId })
