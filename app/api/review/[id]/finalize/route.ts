@@ -63,6 +63,26 @@ export async function POST(
   }
   const { review, prUrl } = cached
 
+  // ── Mutual-exclusivity guards ─────────────────────────────────────────────
+  const totalFindings =
+    review.blockingIssues.length + review.suggestions.length + review.nits.length
+
+  // Prevent a false LGTM comment being posted to a review that has findings.
+  if (approve && totalFindings > 0) {
+    return NextResponse.json(
+      { error: 'Cannot approve a review that has findings. Submit decisions instead.' },
+      { status: 400 }
+    )
+  }
+
+  // Prevent the normal submission path from silently succeeding with no decisions.
+  if (!approve && rawDecisions.length === 0) {
+    return NextResponse.json(
+      { error: 'decisions must not be empty for a findings submission. Use approve:true for clean reviews.' },
+      { status: 400 }
+    )
+  }
+
   // ── Build FindingDecision map from the submitted decisions ────────────────
   const decisionMap: Record<string, FindingDecision> = {}
   for (const d of rawDecisions) {
