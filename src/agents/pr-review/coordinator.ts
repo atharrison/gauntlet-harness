@@ -75,7 +75,7 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
       stage: 'CONTEXT',
       store: deps.checkpoints,
       check: async () => {
-        const ctx = await runContextAgent({ prUrl, reviewId, context })
+        const ctx = await runContextAgent({ prUrl, reviewId, context, emit })
         const pass = Boolean(ctx.diff || ctx.filesChanged.length > 0)
         return {
           pass,
