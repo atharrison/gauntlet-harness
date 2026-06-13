@@ -56,11 +56,11 @@ export function initTracer(): void {
       }
     )
   } else {
-    provider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()))
-    provider.register()
-    console.log(
-      JSON.stringify({ harness_otel_init: { exporter: 'console' } })
+    provider.addSpanProcessor(
+      new SimpleSpanProcessor(new ConsoleSpanExporter())
     )
+    provider.register()
+    console.log(JSON.stringify({ harness_otel_init: { exporter: 'console' } }))
   }
 }
 

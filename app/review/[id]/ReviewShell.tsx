@@ -73,9 +73,10 @@ function formatElapsed(ms: number): string {
 interface Props {
   reviewId: string
   prUrl: string
+  mode?: 'full' | 'quick'
 }
 
-export function ReviewShell({ reviewId, prUrl }: Props) {
+export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
   const [status, setStatus] = useState<StreamStatus>('connecting')
   const [findings, setFindings] = useState<Finding[]>([])
   const [decisions, setDecisions] = useState<Record<string, FindingDecision>>(
@@ -132,7 +133,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   useEffect(() => {
     const es = new EventSource(
-      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`
+      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}&mode=${mode}`
     )
     esRef.current = es
 
@@ -244,7 +245,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     }
 
     return () => es.close()
-  }, [reviewId])
+  }, [reviewId, mode])
 
   function toggle(id: string) {
     setDecisions(prev => ({
@@ -362,6 +363,11 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
         {/* Status bar */}
         <div className="mb-4 flex items-center gap-3">
           <StatusIndicator status={status} />
+          {mode === 'quick' && (
+            <span className="rounded-full bg-indigo-900/50 border border-indigo-700 px-2 py-0.5 text-xs font-semibold text-indigo-300">
+              ⚡ Quick
+            </span>
+          )}
           {status === 'done' && total > 0 && (
             <span className="text-sm text-gray-400">
               {total} finding{total !== 1 ? 's' : ''} — {accepted} accepted
@@ -508,7 +514,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                 onClick={() => handleSubmit(true)}
                 className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
               >
-                {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
+                {submitting
+                  ? 'Submitting…'
+                  : `Submit + Post to GitHub (${accepted}/${total})`}
               </button>
             )}
           </div>
@@ -557,40 +565,49 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
               </span>
             </div>
             <div className="space-y-2">
-              {PIPELINE.map(({ key, label }) => (
-                <PhaseRow
-                  key={key}
-                  label={label}
-                  status={phaseStatuses[key] ?? 'pending'}
-                />
-              ))}
+              {PIPELINE.map(({ key, label }) => {
+                const skipped = mode === 'quick' && key === 'CONTEXT'
+                return (
+                  <PhaseRow
+                    key={key}
+                    label={skipped ? `${label} (skipped)` : label}
+                    status={
+                      skipped ? 'pending' : (phaseStatuses[key] ?? 'pending')
+                    }
+                    dimmed={skipped}
+                  />
+                )
+              })}
             </div>
             {runStats && (
               <div className="mt-3 pt-3 border-t border-gray-800">
                 <p className="text-xs font-mono text-gray-500 tabular-nums">
                   {runStats.tokensUsed.toLocaleString()} tokens
-                  {' · '}
-                  ${runStats.estimatedCostUsd.toFixed(4)}
+                  {' · '}${runStats.estimatedCostUsd.toFixed(4)}
                   {' · '}
                   {formatElapsed(runStats.durationMs)}
                 </p>
                 <div className="mt-1.5 space-y-0.5">
-                  {Object.entries(runStats.phaseDurations ?? {}).map(([phase, ms]) => (
-                    <div key={phase} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600 w-16">{phase}</span>
-                      <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-indigo-600 rounded-full"
-                          style={{
-                            width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
-                          }}
-                        />
+                  {Object.entries(runStats.phaseDurations ?? {}).map(
+                    ([phase, ms]) => (
+                      <div key={phase} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 w-16">
+                          {phase}
+                        </span>
+                        <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full"
+                            style={{
+                              width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
+                          {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
-                        {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               </div>
             )}
@@ -649,9 +666,17 @@ function StatusIndicator({ status }: { status: StreamStatus }) {
   )
 }
 
-function PhaseRow({ label, status }: { label: string; status: PhaseStatus }) {
+function PhaseRow({
+  label,
+  status,
+  dimmed = false,
+}: {
+  label: string
+  status: PhaseStatus
+  dimmed?: boolean
+}) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className={`flex items-center gap-2.5 ${dimmed ? 'opacity-35' : ''}`}>
       <PhaseIcon status={status} />
       <span
         className={`text-xs ${

@@ -53,13 +53,19 @@ Steps:
 4. Search past reviews with search_past_reviews for the most-changed files
 5. When done gathering, output your EnrichedContext JSON.`
 
-  const loopResult = await run(userMessage, deps.model, tools, wrappedDispatch, {
-    maxTurns: 15,
-    maxTokens: 150_000,
-    timeoutMs: 120_000,
-    reviewId,
-    systemPrompt: CONTEXT_AGENT_SYSTEM,
-  })
+  const loopResult = await run(
+    userMessage,
+    deps.model,
+    tools,
+    wrappedDispatch,
+    {
+      maxTurns: 15,
+      maxTokens: 150_000,
+      timeoutMs: 120_000,
+      reviewId,
+      systemPrompt: CONTEXT_AGENT_SYSTEM,
+    }
+  )
 
   // Parse the final JSON output
   const parsed = tryParseEnrichedContext(loopResult.text, prUrl, reviewId)

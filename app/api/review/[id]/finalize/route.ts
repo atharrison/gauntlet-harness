@@ -76,7 +76,10 @@ export async function POST(
   // Prevent a false LGTM comment being posted to a review that has findings.
   if (approve && totalFindings > 0) {
     return NextResponse.json(
-      { error: 'Cannot approve a review that has findings. Submit decisions instead.' },
+      {
+        error:
+          'Cannot approve a review that has findings. Submit decisions instead.',
+      },
       { status: 400 }
     )
   }
@@ -100,24 +103,37 @@ export async function POST(
 
   const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
   if (!prUrlParts) {
-    console.warn(`[finalize/${reviewId}] prUrl could not be parsed — history metadata will be degraded. prUrl: ${prUrl}`)
+    console.warn(
+      `[finalize/${reviewId}] prUrl could not be parsed — history metadata will be degraded. prUrl: ${prUrl}`
+    )
   }
   const memory = createMemoryStore()
 
   if (approve) {
     // ── Approve path: no findings, post LGTM comment ────────────────────────
     const approvalSubmission = buildSubmission(
-      { reviewId, decisions: {}, submitting: false, submitted: true, result: null },
+      {
+        reviewId,
+        decisions: {},
+        submitting: false,
+        submitted: true,
+        result: null,
+      },
       postComment
     )
     await memory
-      .storeReview({ review, submission: approvalSubmission }, {
-        prUrl,
-        repoName: prUrlParts ? `${prUrlParts[1]}/${prUrlParts[2]}` : 'unknown/unknown',
-        prTitle: review.summary.slice(0, 80),
-        author: 'unknown',
-        prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
-      })
+      .storeReview(
+        { review, submission: approvalSubmission },
+        {
+          prUrl,
+          repoName: prUrlParts
+            ? `${prUrlParts[1]}/${prUrlParts[2]}`
+            : 'unknown/unknown',
+          prTitle: review.summary.slice(0, 80),
+          author: 'unknown',
+          prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
+        }
+      )
       .catch(err => console.error('[finalize] storeReview failed:', err))
 
     let commentResult: unknown = null
@@ -126,7 +142,10 @@ export async function POST(
       if (!octokit) {
         commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
       } else if (!prUrlParts) {
-        commentResult = { skipped: true, reason: 'Could not parse prUrl for GitHub API' }
+        commentResult = {
+          skipped: true,
+          reason: 'Could not parse prUrl for GitHub API',
+        }
       } else {
         const commentBody = formatApprovalComment(review)
         const dryRun = process.env.DRY_RUN === 'true'
@@ -153,7 +172,12 @@ export async function POST(
       reviewId,
       status: 'approved',
       comment: commentResult,
-      ...(prUrlParts ? {} : { warning: 'prUrl could not be parsed — history metadata stored with placeholder values' }),
+      ...(prUrlParts
+        ? {}
+        : {
+            warning:
+              'prUrl could not be parsed — history metadata stored with placeholder values',
+          }),
     })
   }
 
@@ -169,7 +193,13 @@ export async function POST(
   }
 
   const submission = buildSubmission(
-    { reviewId, decisions: decisionMap, submitting: false, submitted: true, result: null },
+    {
+      reviewId,
+      decisions: decisionMap,
+      submitting: false,
+      submitted: true,
+      result: null,
+    },
     postComment
   )
 
@@ -177,13 +207,18 @@ export async function POST(
   const rejected = rawDecisions.filter(d => d.action === 'REJECT').length
 
   await memory
-    .storeReview({ review, submission }, {
-      prUrl,
-      repoName: prUrlParts ? `${prUrlParts[1]}/${prUrlParts[2]}` : 'unknown/unknown',
-      prTitle: review.summary.slice(0, 80),
-      author: 'unknown',
-      prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
-    })
+    .storeReview(
+      { review, submission },
+      {
+        prUrl,
+        repoName: prUrlParts
+          ? `${prUrlParts[1]}/${prUrlParts[2]}`
+          : 'unknown/unknown',
+        prTitle: review.summary.slice(0, 80),
+        author: 'unknown',
+        prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
+      }
+    )
     .catch(err => console.error('[finalize] storeReview failed:', err))
 
   let commentResult: unknown = null
@@ -192,7 +227,10 @@ export async function POST(
     if (!octokit) {
       commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
     } else if (!prUrlParts) {
-      commentResult = { skipped: true, reason: 'Could not parse prUrl for GitHub API' }
+      commentResult = {
+        skipped: true,
+        reason: 'Could not parse prUrl for GitHub API',
+      }
     } else {
       const commentBody = formatGitHubComment(review, submission)
       const dryRun = process.env.DRY_RUN === 'true'
@@ -220,6 +258,11 @@ export async function POST(
     status: 'finalized',
     summary: { totalDecisions: rawDecisions.length, accepted, rejected },
     comment: commentResult,
-    ...(prUrlParts ? {} : { warning: 'prUrl could not be parsed — history metadata stored with placeholder values' }),
+    ...(prUrlParts
+      ? {}
+      : {
+          warning:
+            'prUrl could not be parsed — history metadata stored with placeholder values',
+        }),
   })
 }

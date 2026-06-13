@@ -56,19 +56,23 @@ async function _runReview(
 
   // ── INPUT checkpoint ──────────────────────────────────────────────────────
   const inputStart = Date.now()
-  await withSpan('harness.review.input', { 'review.id': reviewId }, async () => {
-    await runCheckpoint({
-      reviewId,
-      stage: 'INPUT',
-      store: deps.checkpoints,
-      check: () =>
-        Promise.resolve({
-          pass: Boolean(prUrl),
-          payload: { prUrl, mode },
-          error: prUrl ? undefined : 'prUrl is required',
-        }),
-    })
-  })
+  await withSpan(
+    'harness.review.input',
+    { 'review.id': reviewId },
+    async () => {
+      await runCheckpoint({
+        reviewId,
+        stage: 'INPUT',
+        store: deps.checkpoints,
+        check: () =>
+          Promise.resolve({
+            pass: Boolean(prUrl),
+            payload: { prUrl, mode },
+            error: prUrl ? undefined : 'prUrl is required',
+          }),
+      })
+    }
+  )
   emit('checkpoint', { stage: 'INPUT', status: 'PASS', reviewId })
   phaseDurations.INPUT = Date.now() - inputStart
 
@@ -103,8 +107,15 @@ async function _runReview(
           stage: 'CONTEXT',
           store: deps.checkpoints,
           check: async () => {
-            const result = await runContextAgent({ prUrl, reviewId, context, emit })
-            const pass = Boolean(result.context.diff || result.context.filesChanged.length > 0)
+            const result = await runContextAgent({
+              prUrl,
+              reviewId,
+              context,
+              emit,
+            })
+            const pass = Boolean(
+              result.context.diff || result.context.filesChanged.length > 0
+            )
             return {
               pass,
               payload: result,
@@ -194,7 +205,8 @@ async function _runReview(
         ],
         []
       )
-      totalTokens += summaryRaw.usage.inputTokens + summaryRaw.usage.outputTokens
+      totalTokens +=
+        summaryRaw.usage.inputTokens + summaryRaw.usage.outputTokens
       totalCost += summaryRaw.cost
 
       const summaryData = parseSummary(summaryRaw.text, enrichedContext)
@@ -230,7 +242,8 @@ async function _runReview(
         },
       })
       span.setAttributes({
-        'tokens.summary': summaryRaw.usage.inputTokens + summaryRaw.usage.outputTokens,
+        'tokens.summary':
+          summaryRaw.usage.inputTokens + summaryRaw.usage.outputTokens,
         'review.verdict': summaryData.verdict,
       })
       return r
