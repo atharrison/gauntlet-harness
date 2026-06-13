@@ -96,21 +96,22 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   })
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [elapsed, setElapsed] = useState(0)
+  const [isCachedReview, setIsCachedReview] = useState(false)
   const startTimeRef = useRef(Date.now())
   const domainDoneRef = useRef(0)
   const esRef = useRef<EventSource | null>(null)
   const activityEndRef = useRef<HTMLDivElement | null>(null)
   const activitySeqRef = useRef(0)
 
-  // Tick elapsed while running
+  // Tick elapsed while running — skip for cache replays (no meaningful duration)
   useEffect(() => {
-    if (status !== 'running') return
+    if (status !== 'running' || isCachedReview) return
     const t = setInterval(
       () => setElapsed(Date.now() - startTimeRef.current),
       1000
     )
     return () => clearInterval(t)
-  }, [status])
+  }, [status, isCachedReview])
 
   // Auto-scroll activity log
   useEffect(() => {
@@ -127,9 +128,14 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     )
     esRef.current = es
 
-    es.addEventListener('connected', () => {
+    es.addEventListener('connected', e => {
+      const data = JSON.parse((e as MessageEvent).data ?? '{}')
       setStatus('running')
-      addActivity({ type: 'phase', text: '⚡ Connected to review stream' })
+      addActivity({
+        type: 'phase',
+        text: data.cached ? '⚡ Loaded from cache' : '⚡ Connected to review stream',
+      })
+      if (data.cached) setIsCachedReview(true)
     })
 
     es.addEventListener('checkpoint', e => {
@@ -483,7 +489,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
               <span
                 className={`text-xs font-mono tabular-nums ${status === 'done' ? 'text-green-500' : 'text-gray-500'}`}
               >
-                {formatElapsed(elapsed)}
+                {isCachedReview ? '⚡ cache' : formatElapsed(elapsed)}
               </span>
             </div>
             <div className="space-y-2">

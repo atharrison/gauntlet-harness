@@ -21,11 +21,11 @@ Run `npm test` after each Stream completes before moving to the next phase.
 
 Everything depends on this. Start here.
 
-- [ ] **1.1** Directory scaffold: `app/`, `src/harness/`, `src/memory/`, `src/agents/pr-review/`, `src/cli/`, `tests/`, `reviews/`
-- [ ] **1.2** `package.json` + `tsconfig.json` + `jest.config.js` (ts-jest preset, node env) + `.env.example` — install all deps
-- [ ] **1.3** `src/agents/pr-review/schema.ts` — Zod schemas: `Finding`, `EnrichedContext`, `DomainResult`, `PRReview`, `FileCoverage`, `AlignmentItem`, `CheckpointRecord`
+- [x] **1.1** Directory scaffold: `app/`, `src/harness/`, `src/memory/`, `src/agents/pr-review/`, `src/cli/`, `tests/`, `reviews/`
+- [x] **1.2** `package.json` + `tsconfig.json` + `jest.config.js` (ts-jest preset, node env) + `.env.example` — install all deps
+- [x] **1.3** `src/agents/pr-review/schema.ts` — Zod schemas: `Finding`, `EnrichedContext`, `DomainResult`, `PRReview`, `FileCoverage`, `AlignmentItem`, `CheckpointRecord`
   - [ ] `tests/schema.test.ts` — valid fixture parses; required fields missing → parse fails
-- [ ] **1.4** `src/harness/alarms.ts` — `AlarmType` enum, `AlarmSeverity`, `Alarm` interface, `fireAlarm()`
+- [x] **1.4** `src/harness/alarms.ts` — `AlarmType` enum, `AlarmSeverity`, `Alarm` interface, `fireAlarm()`
   - [ ] `tests/alarms.test.ts` — `fireAlarm()` emits correct shape; all `AlarmType` values exist in enum
 
 ---
@@ -34,25 +34,25 @@ Everything depends on this. Start here.
 
 ### Stream A — Harness Core (`src/harness/`) · [FIR-2](https://linear.app/atharrison/issue/FIR-2)
 
-- [ ] **A.1** `models.ts` — `ModelClient` interface + Anthropic adapter
+- [x] **A.1** `models.ts` — `ModelClient` interface + Anthropic adapter
   - [ ] `tests/models.test.ts` — mock adapter returns expected `ModelReply` shape
-- [ ] **A.2** `loop.ts` — agent loop: `maxTurns`, `maxTokens`, `timeoutMs` hard stops; fires alarms on breach
+- [x] **A.2** `loop.ts` — agent loop: `maxTurns`, `maxTokens`, `timeoutMs` hard stops; fires alarms on breach
   - [ ] `tests/loop.test.ts` — exceeding `maxTurns` fires `TURN_LIMIT_EXCEEDED`; final answer exits cleanly; `REPEATED_TOOL_CALL` detected after 3 identical calls
-- [ ] **A.3** `tools.ts` — `ToolRegistry` type, `dispatch()` with allow-list + Zod arg validation
+- [x] **A.3** `tools.ts` — `ToolRegistry` type, `dispatch()` with allow-list + Zod arg validation
   - [ ] `tests/tools.test.ts` — unknown tool returns error-as-data; invalid args rejected by Zod; known tool executes and returns result
-- [ ] **A.4** `checkpoints.ts` — `runCheckpoint()`, `CheckpointStage` enum, Supabase persistence
+- [x] **A.4** `checkpoints.ts` — `runCheckpoint()`, `CheckpointStage` enum, Supabase persistence
   - [ ] `tests/checkpoints.test.ts` — PASS writes checkpoint record; FAIL fires `CHECKPOINT_FAILED` alarm; mock store called with correct stage
-- [ ] **A.5** `guardrails.ts` — output integrity: schema validation, file citation check, secret scan; fires alarms
+- [x] **A.5** `guardrails.ts` — output integrity: schema validation, file citation check, secret scan; fires alarms
   - [ ] `tests/guardrails.test.ts` — hallucinated file citation fires `HALLUCINATED_FILE_CITATION`; secret pattern fires `SECRET_DETECTED`; valid output passes cleanly
-- [ ] **A.6** `observability.ts` — OTel tracer setup, `tracedModelCall()`, `recordApprovalDecision()`
+- [ ] **A.6** `observability.ts` — OTel tracer setup, `tracedModelCall()`, `recordApprovalDecision()` _(see Phase 10)_
   - [ ] `tests/observability.test.ts` — `tracedModelCall()` attaches token + cost attributes to span
 
 ### Stream B — Memory Layer (`src/memory/`) · [FIR-3](https://linear.app/atharrison/issue/FIR-3)
 
-- [ ] **B.1** `store.ts` — `MemoryStore` interface
-- [ ] **B.2** `supabase.ts` — `SupabaseMemoryStore` (`memories`, `review_history`, `review_checkpoints` tables)
-- [ ] **B.3** `local.ts` — `LocalMemoryStore` (SQLite, CLI fallback)
-- [ ] **B.4** Supabase migration SQL — `memories`, `review_history`, `review_checkpoints` tables
+- [x] **B.1** `store.ts` — `MemoryStore` interface
+- [x] **B.2** `supabase.ts` — `SupabaseMemoryStore` (`memories`, `review_history`, `review_checkpoints` tables)
+- [x] **B.3** `local.ts` — `LocalMemoryStore` (SQLite, CLI fallback)
+- [x] **B.4** Supabase migration SQL — `memories`, `review_history`, `review_checkpoints` tables
 
 ---
 
@@ -60,30 +60,30 @@ Everything depends on this. Start here.
 
 ### Stream C — Tool Implementations · [FIR-4](https://linear.app/atharrison/issue/FIR-4)
 
-- [ ] **C.1** GitHub tools: `fetch_pr_diff`, `fetch_pr_comments`, `fetch_pr_files`, `post_review_comment`
-- [ ] **C.2** Memory tools: `search_past_reviews`, `store_review`, `create_memory`
-- [ ] **C.3** Ticket tools: `fetch_ticket` (Linear adapter), `search_tickets`
+- [x] **C.1** GitHub tools: `fetch_pr_diff`, `fetch_pr_comments`, `fetch_pr_files`, `post_review_comment`
+- [x] **C.2** Memory tools: `search_past_reviews`, `store_review`, `create_memory`
+- [x] **C.3** Ticket tools: `fetch_ticket` (Linear adapter), `search_tickets`
 
 ### Stream D — Web Shell (stub routes now, wire agents later) · [FIR-5](https://linear.app/atharrison/issue/FIR-5)
 
-- [ ] **D.1** `next.config.ts` (`output: "standalone"`), `app/layout.tsx`, `app/page.tsx`
-- [ ] **D.2** Supabase SSR middleware — `middleware.ts` (session refresh + route protection) + `/auth/callback` route handler using `@supabase/ssr`
-- [ ] **D.3** `app/api/review/start/route.ts` — stub (returns `{ reviewId }`)
-- [ ] **D.4** `app/api/review/[id]/route.ts` — SSE stream stub
-- [ ] **D.5** `app/api/review/[id]/finalize/route.ts` — stub
-- [ ] **D.6** `app/review/[id]/page.tsx` — approval UI shell (finding cards, checkbox, inline edit)
+- [x] **D.1** `next.config.ts` (`output: "standalone"`), `app/layout.tsx`, `app/page.tsx`
+- [x] **D.2** Supabase SSR middleware — `middleware.ts` (session refresh + route protection) + `/auth/callback` route handler using `@supabase/ssr` _(disabled for demo; re-enable in Phase 9)_
+- [x] **D.3** `app/api/review/start/route.ts` — stub (returns `{ reviewId }`)
+- [x] **D.4** `app/api/review/[id]/route.ts` — SSE stream stub
+- [x] **D.5** `app/api/review/[id]/finalize/route.ts` — stub
+- [x] **D.6** `app/review/[id]/page.tsx` — approval UI shell (finding cards, checkbox, inline edit)
 
 ---
 
 ## 🔒 Phase 5b — Agents (sequential after A + B + C complete) · [FIR-6](https://linear.app/atharrison/issue/FIR-6)
 
-- [ ] **5.1** `src/agents/pr-review/prompts.ts` — system prompts + domain instruction blocks _(can draft during Phase 4)_
-- [ ] **5.2** `src/agents/pr-review/context-agent.ts` — full loop, tool calls, produces `EnrichedContext`
-- [ ] **5.3** `src/agents/pr-review/correctness-agent.ts` — single-shot structured output _(parallel with 5.4)_
-- [ ] **5.4** `src/agents/pr-review/security-agent.ts` — single-shot structured output _(parallel with 5.3)_
-- [ ] **5.5** `src/agents/pr-review/merge.ts` — dedup by file+line proximity, confidence calibration, sort
-- [ ] **5.6** `src/agents/pr-review/coordinator.ts` — orchestrate phases, `Promise.all` fan-out, checkpoint writes
-- [ ] **5.7** `src/agents/pr-review/approval.ts` — shared approval state machine (used by CLI + web)
+- [x] **5.1** `src/agents/pr-review/prompts.ts` — system prompts + domain instruction blocks _(can draft during Phase 4)_
+- [x] **5.2** `src/agents/pr-review/context-agent.ts` — full loop, tool calls, produces `EnrichedContext`
+- [x] **5.3** `src/agents/pr-review/correctness-agent.ts` — single-shot structured output _(parallel with 5.4)_
+- [x] **5.4** `src/agents/pr-review/security-agent.ts` — single-shot structured output _(parallel with 5.3)_
+- [x] **5.5** `src/agents/pr-review/merge.ts` — dedup by file+line proximity, confidence calibration, sort
+- [x] **5.6** `src/agents/pr-review/coordinator.ts` — orchestrate phases, `Promise.all` fan-out, checkpoint writes
+- [x] **5.7** `src/agents/pr-review/approval.ts` — shared approval state machine (used by CLI + web)
 - [ ] **5.8** (stretch) `style-agent.ts`, `conventions-agent.ts`, `performance-agent.ts`
 
 ---
@@ -92,29 +92,65 @@ Everything depends on this. Start here.
 
 ### Stream E — Wire Agents into Web Routes · [FIR-8](https://linear.app/atharrison/issue/FIR-8)
 
-- [ ] **E.1** Wire `start` route → coordinator, persist `reviewId` to Supabase
-- [ ] **E.2** Wire SSE route → stream `DomainResult` + `Alarm` events as agents complete
-- [ ] **E.3** Wire `finalize` route → `store_review`, optionally `post_review_comment`
+- [x] **E.1** Wire `start` route → coordinator, persist `reviewId` to Supabase
+- [x] **E.2** Wire SSE route → stream `DomainResult` + `Alarm` events as agents complete
+- [x] **E.3** Wire `finalize` route → `store_review`, optionally `post_review_comment`
 
 ### Stream F — Railway · [FIR-8](https://linear.app/atharrison/issue/FIR-8)
 
-- [ ] **F.1** `Dockerfile` — multi-stage build: Node 22 Alpine base, `npm ci`, Next.js standalone output, non-root user
-- [ ] **F.2** Create Railway project, configure env vars:
+- [x] **F.1** `Dockerfile` — multi-stage build: Node 22 Alpine base, `npm ci`, Next.js standalone output, non-root user
+- [x] **F.2** Create Railway project, configure env vars:
   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
   - `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `LINEAR_API_KEY`
-- [ ] **F.3** Push to GitHub → Railway auto-deploy wired
-- [ ] **F.4** Smoke test: POST `/api/review/start` with PR #1 URL, verify SSE stream responds
+- [x] **F.3** Push to GitHub → Railway auto-deploy wired
+- [x] **F.4** Smoke test: POST `/api/review/start` with PR #1 URL, verify SSE stream responds
 
 ---
 
 ## 🔒 Phase 7 — Demo Polish (sequential, end of day) · [FIR-7](https://linear.app/atharrison/issue/FIR-7)
 
-- [ ] **7.1** End-to-end run against `python-adventofcode2020` PR #1 — verify findings hit known smells
+- [x] **7.1** End-to-end run against `python-adventofcode2020` PR #1 — verify findings hit known smells
   - Expected: no type hints/docstrings, debug prints, magic `'x'` string, undocumented CRT assumption, duplicate list filtering
 - [ ] **7.2** `--quick` mode verified: Correctness + Security only, ~30 sec, BLOCKING findings only
-- [ ] **7.3** Write `HARNESS.md` — required deliverable; maps working system to 4-pillar judges' vocabulary
+- [x] **7.3** Write `HARNESS.md` — required deliverable; maps working system to 4-pillar judges' vocabulary
 - [ ] **7.4** (bonus) Swap in second agent during demo to prove portability
 - [ ] **7.5** Record 5-min demo video
+
+---
+
+## 🗂 Phase 8 — Review History (post-demo feature requests)
+
+> Single-user demo mode (no auth filtering). All reviews on the instance are visible.
+> `review_history` SQLite table is already populated on every `finalize`.
+
+- [ ] **8.1** `GET /api/history` — list all `ReviewRecord` rows, newest first (limit 50)
+- [ ] **8.2** `/history` page — table of past reviews: repo, PR title, date, finding count, summary
+- [ ] **8.3** Link each row back to `/review/{id}` (cache replay if still warm, re-run if expired)
+- [ ] **8.4** Add "History" nav link to global header (`app/layout.tsx`)
+
+---
+
+## 🔐 Phase 9 — Authentication (post-demo feature requests)
+
+> Currently auth middleware is disabled for demo. Re-enabling requires schema changes.
+
+- [ ] **9.1** Add `user_id` column to `review_history` SQLite table (migration)
+- [ ] **9.2** Re-enable Supabase SSR auth middleware (`middleware.ts`) to protect `/review/*` and `/history`
+- [ ] **9.3** Filter `/api/history` results by authenticated user
+- [ ] **9.4** Associate finalized reviews with the logged-in user (pass user_id through finalize route)
+- [ ] **9.5** Login/logout UI in the header
+
+---
+
+## 📊 Phase 10 — Observability · (post-demo feature request)
+
+Surface token usage, cost, per-phase timing, and alarms in both the browser UI and Railway structured logs.
+
+- [ ] **10.1** Fix alarm SSE wiring — `setSseEmitter` is never called in the SSE route; alarms from `loop.ts` (TURN_LIMIT, TOKEN_BUDGET, REPEATED_TOOL_CALL) never reach the browser
+- [ ] **10.2** Emit `stats` SSE event at end of each fresh run: `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount }` — display in pipeline sidebar
+- [ ] **10.3** Add per-phase timing: record start/end timestamps for INPUT, CONTEXT, DOMAIN, OUTPUT in the coordinator; include in `stats` event
+- [ ] **10.4** Log a one-line JSON summary to stdout on run completion (Railway-friendly structured log): `{ reviewId, prUrl, tokensUsed, cost, durationMs, findings, alarms }`
+- [ ] **10.5** Show alarm badges in the pipeline sidebar (e.g. "⚠ 2 alarms" with severity color) — currently alarm events arrive but are only appended to the activity feed with no visual weight
 
 ---
 
