@@ -9,7 +9,7 @@ Repo: https://github.com/atharrison/gauntlet-harness
 
 ## What It Does
 
-Paste a GitHub PR URL. Five specialized agents review it in parallel. You curate the findings — accept, reject, or edit each one — before anything reaches your team. The system gets smarter with each review: past reviews and team standards are injected as context automatically.
+Paste a GitHub PR URL. Multiple specialized agents review it in parallel. You curate the findings — accept, reject, or edit each one — before anything reaches your team. The system gets smarter with each review: past reviews and team standards are injected as context automatically.
 
 ```
 Browser → POST /api/review/start

@@ -85,6 +85,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const [editTitle, setEditTitle] = useState('')
   const [editBody, setEditBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
   const [phaseStatuses, setPhaseStatuses] = useState<
     Record<string, PhaseStatus>
@@ -97,6 +98,13 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [elapsed, setElapsed] = useState(0)
   const [isCachedReview, setIsCachedReview] = useState(false)
+  const [runStats, setRunStats] = useState<{
+    tokensUsed: number
+    estimatedCostUsd: number
+    durationMs: number
+    findingsCount: number
+    phaseDurations: Record<string, number>
+  } | null>(null)
   const startTimeRef = useRef(Date.now())
   const domainDoneRef = useRef(0)
   const esRef = useRef<EventSource | null>(null)
@@ -213,6 +221,15 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       es.close()
     })
 
+    es.addEventListener('stats', e => {
+      try {
+        const data = JSON.parse((e as MessageEvent).data)
+        setRunStats(data)
+      } catch {
+        // malformed stats payload — degrade gracefully, don't crash the handler
+      }
+    })
+
     es.addEventListener('error', e => {
       const msg = (e as MessageEvent).data
         ? JSON.parse((e as MessageEvent).data).error
@@ -260,6 +277,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   async function handleSubmit(postComment: boolean) {
     setSubmitting(true)
+    setSubmitResult(null) // clear any previous error before retry
     try {
       const body = {
         decisions: Object.values(decisions).map(d => ({
@@ -285,6 +303,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           ? `Submitted: ${data.summary.accepted} accepted, ${data.summary.rejected} rejected`
           : `Error: ${data.error}`
       )
+      if (res.ok) setSubmitted(true)
     } catch {
       setSubmitResult('Error: unexpected server response')
     } finally {
@@ -294,6 +313,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   async function handleApprove(postComment: boolean) {
     setSubmitting(true)
+    setSubmitResult(null) // clear any previous error before retry
     try {
       const res = await fetch(`/api/review/${reviewId}/finalize`, {
         method: 'POST',
@@ -308,6 +328,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
             : '✓ Marked as approved'
           : `Error: ${data.error}`
       )
+      if (res.ok) setSubmitted(true)
     } catch {
       setSubmitResult('Error: unexpected server response')
     } finally {
@@ -476,32 +497,45 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
         {/* Submit controls */}
         {status === 'done' && total > 0 && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              disabled={submitting}
-              onClick={() => handleSubmit(true)}
-              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
-            </button>
+          <div className="mt-6">
+            {submitted ? (
+              <p className="rounded-lg border border-green-700 bg-green-950/40 px-4 py-2.5 text-sm font-medium text-green-400">
+                {submitResult}
+              </p>
+            ) : (
+              <button
+                disabled={submitting}
+                onClick={() => handleSubmit(true)}
+                className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
+              </button>
+            )}
           </div>
         )}
 
         {/* Clean review: no findings → Approve CTA */}
         {status === 'done' && total === 0 && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              disabled={submitting}
-              onClick={() => handleApprove(true)}
-              className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
-            >
-              {submitting ? 'Approving…' : '✓ Approve PR on GitHub'}
-            </button>
+          <div className="mt-6">
+            {submitted ? (
+              <p className="rounded-lg border border-green-700 bg-green-950/40 px-4 py-2.5 text-sm font-medium text-green-400">
+                {submitResult}
+              </p>
+            ) : (
+              <button
+                disabled={submitting}
+                onClick={() => handleApprove(true)}
+                className="rounded-lg bg-green-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+              >
+                {submitting ? 'Approving…' : '✓ Approve PR on GitHub'}
+              </button>
+            )}
           </div>
         )}
 
-        {submitResult && (
-          <p className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-green-400">
+        {/* Error result (only shown when not yet submitted successfully) */}
+        {submitResult && !submitted && (
+          <p className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-red-400">
             {submitResult}
           </p>
         )}
@@ -531,6 +565,35 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                 />
               ))}
             </div>
+            {runStats && (
+              <div className="mt-3 pt-3 border-t border-gray-800">
+                <p className="text-xs font-mono text-gray-500 tabular-nums">
+                  {runStats.tokensUsed.toLocaleString()} tokens
+                  {' · '}
+                  ${runStats.estimatedCostUsd.toFixed(4)}
+                  {' · '}
+                  {formatElapsed(runStats.durationMs)}
+                </p>
+                <div className="mt-1.5 space-y-0.5">
+                  {Object.entries(runStats.phaseDurations ?? {}).map(([phase, ms]) => (
+                    <div key={phase} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 w-16">{phase}</span>
+                      <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 rounded-full"
+                          style={{
+                            width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
+                        {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Activity feed */}
