@@ -26,7 +26,7 @@ export default function HomePage() {
         setError(data.error ?? 'Failed to start review')
         return
       }
-      const dest = `/review/${data.reviewId}?prUrl=${encodeURIComponent(data.prUrl)}&mode=${data.mode}`
+      const dest = `/review/${data.reviewId}?prUrl=${encodeURIComponent(data.prUrl ?? prUrl)}&mode=${data.mode ?? (quickMode ? 'quick' : 'full')}`
       router.push(dest)
     } catch {
       setError('Network error — please try again')
@@ -45,7 +45,10 @@ export default function HomePage() {
         workflow. Paste a GitHub PR URL to get started.
       </p>
 
-      <form onSubmit={handleSubmit} className="flex w-full max-w-xl flex-col gap-3">
+      <form
+        onSubmit={handleSubmit}
+        className="flex w-full max-w-xl flex-col gap-3"
+      >
         <input
           type="url"
           value={prUrl}
@@ -70,7 +73,9 @@ export default function HomePage() {
           <span className="text-sm text-gray-300">
             <span className="font-semibold text-white">⚡ Quick mode</span>
             <span className="ml-2 text-gray-500">
-              {quickMode ? 'Correctness + security only (~30s)' : 'Full review with context agent (~2 min)'}
+              {quickMode
+                ? 'Correctness + security only (~30s)'
+                : 'Full review with context agent (~2 min)'}
             </span>
           </span>
         </label>

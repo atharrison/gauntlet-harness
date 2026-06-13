@@ -245,7 +245,7 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
     }
 
     return () => es.close()
-  }, [reviewId])
+  }, [reviewId, mode])
 
   function toggle(id: string) {
     setDecisions(prev => ({
@@ -514,7 +514,9 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
                 onClick={() => handleSubmit(true)}
                 className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
               >
-                {submitting ? 'Submitting…' : `Submit + Post to GitHub (${accepted}/${total})`}
+                {submitting
+                  ? 'Submitting…'
+                  : `Submit + Post to GitHub (${accepted}/${total})`}
               </button>
             )}
           </div>
@@ -569,7 +571,9 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
                   <PhaseRow
                     key={key}
                     label={skipped ? `${label} (skipped)` : label}
-                    status={skipped ? 'pending' : (phaseStatuses[key] ?? 'pending')}
+                    status={
+                      skipped ? 'pending' : (phaseStatuses[key] ?? 'pending')
+                    }
                     dimmed={skipped}
                   />
                 )
@@ -579,28 +583,31 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
               <div className="mt-3 pt-3 border-t border-gray-800">
                 <p className="text-xs font-mono text-gray-500 tabular-nums">
                   {runStats.tokensUsed.toLocaleString()} tokens
-                  {' · '}
-                  ${runStats.estimatedCostUsd.toFixed(4)}
+                  {' · '}${runStats.estimatedCostUsd.toFixed(4)}
                   {' · '}
                   {formatElapsed(runStats.durationMs)}
                 </p>
                 <div className="mt-1.5 space-y-0.5">
-                  {Object.entries(runStats.phaseDurations ?? {}).map(([phase, ms]) => (
-                    <div key={phase} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600 w-16">{phase}</span>
-                      <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-indigo-600 rounded-full"
-                          style={{
-                            width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
-                          }}
-                        />
+                  {Object.entries(runStats.phaseDurations ?? {}).map(
+                    ([phase, ms]) => (
+                      <div key={phase} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 w-16">
+                          {phase}
+                        </span>
+                        <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full"
+                            style={{
+                              width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
+                          {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-600 font-mono tabular-nums w-12 text-right">
-                        {ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               </div>
             )}
