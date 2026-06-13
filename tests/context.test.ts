@@ -1,3 +1,11 @@
+// Mock the github tools module — @octokit/rest is ESM-only and can't be loaded
+// by Jest's CJS runtime. buildRegistry() lazy-requires it; we mock so it
+// returns an empty object instead.
+jest.mock("../src/tools/github", () => ({
+  createGithubTools: () => ({}),
+  createOctokit: () => ({}),
+}))
+
 import { createReviewContext, buildRegistry } from "../src/harness/context";
 import { LocalMemoryStore } from "../src/memory/local";
 import { InMemoryCheckpointStore } from "../src/harness/checkpoints";
@@ -12,7 +20,7 @@ function tempDb() {
 }
 
 describe("buildRegistry", () => {
-  it("returns an empty registry before FIR-4 tools are wired in", () => {
+  it("registers all expected tools", () => {
     const memory = new LocalMemoryStore(tempDb());
     const deps = {
       model: createModelClient({ provider: "anthropic", apiKey: "test-key" }),
@@ -20,7 +28,13 @@ describe("buildRegistry", () => {
       checkpoints: new InMemoryCheckpointStore(),
     };
     const registry = buildRegistry(deps);
-    expect(Object.keys(registry)).toHaveLength(0);
+    const names = Object.keys(registry).sort();
+    // GitHub tools (mocked), memory tools, ticket tools
+    expect(names).toContain("search_past_reviews");
+    expect(names).toContain("store_review");
+    expect(names).toContain("create_memory");
+    expect(names).toContain("fetch_ticket");
+    expect(names).toContain("search_tickets");
   });
 });
 
