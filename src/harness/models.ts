@@ -38,7 +38,11 @@ export interface ModelReply {
 // The loop only ever calls this. No vendor SDK imported in loop.ts.
 
 export interface ModelClient {
-  chat(messages: Message[], tools: ToolDefinition[]): Promise<ModelReply>
+  chat(
+    messages: Message[],
+    tools: ToolDefinition[],
+    systemPrompt?: string
+  ): Promise<ModelReply>
 }
 
 // ── Cost helpers ──────────────────────────────────────────────────────────────
@@ -70,7 +74,8 @@ export class AnthropicClient implements ModelClient {
 
   async chat(
     messages: Message[],
-    tools: ToolDefinition[]
+    tools: ToolDefinition[],
+    systemPrompt?: string
   ): Promise<ModelReply> {
     // Build Anthropic message array, injecting tool results as user messages
     const allMessages: Anthropic.MessageParam[] = []
@@ -103,6 +108,7 @@ export class AnthropicClient implements ModelClient {
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 8192,
+      system: systemPrompt,
       messages: allMessages,
       tools: anthropicTools.length > 0 ? anthropicTools : undefined,
     })
