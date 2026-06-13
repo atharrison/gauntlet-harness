@@ -8,7 +8,9 @@ interface Finding {
   category: string;
   file: string;
   line?: number;
-  message: string;
+  title: string;
+  body: string;
+  confidence: number;
   suggestedFix?: string;
 }
 
@@ -51,7 +53,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    const es = new EventSource(`/api/review/${reviewId}`);
+    const es = new EventSource(
+      `/api/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`,
+    );
     esRef.current = es;
 
     es.addEventListener("connected", () => {
@@ -219,6 +223,9 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                       {f.line ? `:${f.line}` : ""}
                     </span>
                     <span className="text-xs text-gray-500">{f.category}</span>
+                    <span className="text-xs text-gray-600">
+                      {Math.round(f.confidence * 100)}% confidence
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -233,7 +240,8 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   </div>
                 </div>
 
-                <p className="mt-2 text-sm text-gray-200">{f.message}</p>
+                <p className="mt-2 text-sm font-medium text-gray-100">{f.title}</p>
+                <p className="mt-1 text-sm text-gray-400">{f.body}</p>
 
                 {isEditing ? (
                   <div className="mt-3">
