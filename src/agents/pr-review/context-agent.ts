@@ -4,10 +4,13 @@ import type { ReviewContext } from '../../harness/context'
 import { EnrichedContextSchema, type EnrichedContext } from './schema'
 import { CONTEXT_AGENT_SYSTEM } from './prompts'
 
+type Emitter = (event: string, data: unknown) => void
+
 export interface ContextAgentOptions {
   prUrl: string
   reviewId: string
   context: ReviewContext
+  emit?: Emitter
 }
 
 /**
@@ -21,11 +24,17 @@ export interface ContextAgentOptions {
 export async function runContextAgent(
   options: ContextAgentOptions
 ): Promise<EnrichedContext> {
-  const { prUrl, reviewId, context } = options
+  const { prUrl, reviewId, context, emit = () => {} } = options
   const { deps, registry, dispatcher } = context
 
   const tools = toToolDefinitions(registry)
-  const dispatch = dispatcher(reviewId)
+  const baseDispatch = dispatcher(reviewId)
+
+  // Wrap dispatcher so every tool call emits a progress event to the client
+  const wrappedDispatch: typeof baseDispatch = async call => {
+    emit('progress', { tool: call.name, args: call.args })
+    return baseDispatch(call)
+  }
 
   const userMessage = `Please review the following GitHub pull request and gather all context needed for a thorough review.
 
@@ -38,7 +47,7 @@ Steps:
 4. Search past reviews with search_past_reviews for the most-changed files
 5. When done gathering, output your EnrichedContext JSON.`
 
-  const result = await run(userMessage, deps.model, tools, dispatch, {
+  const result = await run(userMessage, deps.model, tools, wrappedDispatch, {
     maxTurns: 15,
     maxTokens: 150_000,
     timeoutMs: 120_000,

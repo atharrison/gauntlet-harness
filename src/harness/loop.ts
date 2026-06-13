@@ -112,7 +112,11 @@ export async function run(
     }
 
     // Build assistant message with tool_use blocks preserved for history
-    messages.push({ role: 'assistant', content: reply.text || '', toolCalls: reply.toolCalls })
+    messages.push({
+      role: 'assistant',
+      content: reply.text || '',
+      toolCalls: reply.toolCalls,
+    })
 
     // Dispatch tool calls, check for repeat
     for (const call of reply.toolCalls) {

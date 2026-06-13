@@ -106,6 +106,7 @@ export type PRReview = z.infer<typeof PRReviewSchema>
 export const FindingDecisionSchema = z.object({
   findingId: z.string(),
   action: z.enum(['ACCEPT', 'REJECT', 'EDIT']),
+  editedTitle: z.string().optional(),
   editedBody: z.string().optional(),
 })
 export type FindingDecision = z.infer<typeof FindingDecisionSchema>

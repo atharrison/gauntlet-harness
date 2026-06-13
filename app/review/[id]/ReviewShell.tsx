@@ -17,10 +17,18 @@ interface Finding {
 interface FindingDecision {
   findingId: string
   accepted: boolean
-  editedText?: string
+  editedTitle?: string
+  editedBody?: string
 }
 
 type StreamStatus = 'connecting' | 'running' | 'done' | 'error'
+type PhaseStatus = 'pending' | 'running' | 'done' | 'error'
+
+interface ActivityEntry {
+  id: number
+  type: 'tool' | 'phase' | 'finding' | 'alarm'
+  text: string
+}
 
 const SEVERITY_STYLES: Record<Finding['severity'], string> = {
   BLOCKING: 'border-red-600 bg-red-950/30',
@@ -32,6 +40,34 @@ const SEVERITY_BADGE: Record<Finding['severity'], string> = {
   BLOCKING: 'bg-red-700 text-red-100',
   SUGGESTION: 'bg-yellow-700 text-yellow-100',
   NIT: 'bg-gray-700 text-gray-300',
+}
+
+const PIPELINE: { key: string; label: string }[] = [
+  { key: 'INPUT', label: 'Input validation' },
+  { key: 'CONTEXT', label: 'Context agent' },
+  { key: 'DOMAIN', label: 'Domain agents' },
+  { key: 'OUTPUT', label: 'Final review' },
+]
+
+function formatTool(tool: string, args: Record<string, unknown>): string {
+  switch (tool) {
+    case 'fetch_pr_diff':
+      return 'Reading PR diff…'
+    case 'fetch_pr_files':
+      return 'Listing changed files…'
+    case 'fetch_ticket':
+      return `Fetching ticket ${args.ticketId ?? ''}…`
+    case 'search_past_reviews':
+      return `Searching history: ${args.file ?? ''}…`
+    default:
+      return tool.replace(/_/g, ' ') + '…'
+  }
+}
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const m = Math.floor(s / 60)
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
 }
 
 interface Props {
@@ -46,11 +82,44 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     {}
   )
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editBody, setEditBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
-  const [events, setEvents] = useState<string[]>([])
+  const [phaseStatuses, setPhaseStatuses] = useState<
+    Record<string, PhaseStatus>
+  >({
+    INPUT: 'running',
+    CONTEXT: 'pending',
+    DOMAIN: 'pending',
+    OUTPUT: 'pending',
+  })
+  const [activity, setActivity] = useState<ActivityEntry[]>([])
+  const [elapsed, setElapsed] = useState(0)
+  const startTimeRef = useRef(Date.now())
+  const domainDoneRef = useRef(0)
   const esRef = useRef<EventSource | null>(null)
+  const activityEndRef = useRef<HTMLDivElement | null>(null)
+  const activitySeqRef = useRef(0)
+
+  // Tick elapsed while running
+  useEffect(() => {
+    if (status !== 'running') return
+    const t = setInterval(
+      () => setElapsed(Date.now() - startTimeRef.current),
+      1000
+    )
+    return () => clearInterval(t)
+  }, [status])
+
+  // Auto-scroll activity log
+  useEffect(() => {
+    activityEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [activity])
+
+  function addActivity(entry: Omit<ActivityEntry, 'id'>) {
+    setActivity(prev => [...prev, { ...entry, id: ++activitySeqRef.current }])
+  }
 
   useEffect(() => {
     const es = new EventSource(
@@ -60,7 +129,49 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
     es.addEventListener('connected', () => {
       setStatus('running')
-      setEvents(prev => [...prev, 'Connected to review stream'])
+      addActivity({ type: 'phase', text: '⚡ Connected to review stream' })
+    })
+
+    es.addEventListener('checkpoint', e => {
+      const data = JSON.parse(e.data)
+      if (data.stage === 'INPUT') {
+        setPhaseStatuses(p => ({ ...p, INPUT: 'done', CONTEXT: 'running' }))
+        addActivity({
+          type: 'phase',
+          text: '✓ Input validated — starting context agent',
+        })
+      } else if (data.stage === 'CONTEXT') {
+        setPhaseStatuses(p => ({ ...p, CONTEXT: 'done', DOMAIN: 'running' }))
+        addActivity({
+          type: 'phase',
+          text: '✓ Context gathered — running domain agents',
+        })
+      } else if (data.stage === 'DOMAIN') {
+        const agentName =
+          typeof data.agentName === 'string' ? data.agentName : 'unknown'
+        addActivity({ type: 'phase', text: `✓ ${agentName} agent complete` })
+        domainDoneRef.current += 1
+        if (domainDoneRef.current >= 2) {
+          setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'running' }))
+          addActivity({
+            type: 'phase',
+            text: '✓ Both domain agents done — generating summary',
+          })
+        }
+      } else if (data.stage === 'OUTPUT') {
+        setPhaseStatuses(p => ({ ...p, OUTPUT: 'done' }))
+      }
+    })
+
+    es.addEventListener('progress', e => {
+      const data = JSON.parse(e.data)
+      addActivity({
+        type: 'tool',
+        text: formatTool(
+          data.tool,
+          (data.args ?? {}) as Record<string, unknown>
+        ),
+      })
     })
 
     es.addEventListener('finding', e => {
@@ -73,21 +184,24 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           accepted: finding.severity !== 'NIT',
         },
       }))
-    })
-
-    es.addEventListener('checkpoint', e => {
-      const data = JSON.parse(e.data)
-      setEvents(prev => [...prev, `Checkpoint: ${data.stage} → ${data.status}`])
+      addActivity({
+        type: 'finding',
+        text: `● [${finding.severity}] ${finding.title}`,
+      })
     })
 
     es.addEventListener('alarm', e => {
       const data = JSON.parse(e.data)
-      setEvents(prev => [...prev, `⚠ Alarm: ${data.alarm?.type ?? 'unknown'}`])
+      addActivity({
+        type: 'alarm',
+        text: `⚠ Alarm: ${data.alarm?.type ?? 'unknown'}`,
+      })
     })
 
     es.addEventListener('done', () => {
       setStatus('done')
-      setEvents(prev => [...prev, 'Review complete'])
+      setElapsed(Date.now() - startTimeRef.current)
+      addActivity({ type: 'phase', text: '🎉 Review complete' })
       es.close()
     })
 
@@ -95,7 +209,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       const msg = (e as MessageEvent).data
         ? JSON.parse((e as MessageEvent).data).error
         : 'Unknown error'
-      setEvents(prev => [...prev, `Error: ${msg}`])
+      addActivity({ type: 'alarm', text: `✗ Error: ${msg}` })
       setStatus('error')
     })
 
@@ -116,13 +230,22 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   function startEdit(finding: Finding) {
     setEditingId(finding.id)
-    setEditText(decisions[finding.id]?.editedText ?? finding.suggestedFix ?? '')
+    const d = decisions[finding.id]
+    setEditTitle(d?.editedTitle ?? finding.title)
+    setEditBody(d?.editedBody ?? finding.body)
   }
 
   function saveEdit(id: string) {
+    const finding = findings.find(f => f.id === id)
     setDecisions(prev => ({
       ...prev,
-      [id]: { ...prev[id], editedText: editText || undefined },
+      [id]: {
+        ...prev[id],
+        editedTitle:
+          editTitle !== finding?.title ? editTitle || undefined : undefined,
+        editedBody:
+          editBody !== finding?.body ? editBody || undefined : undefined,
+      },
     }))
     setEditingId(null)
   }
@@ -133,8 +256,13 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       const body = {
         decisions: Object.values(decisions).map(d => ({
           findingId: d.findingId,
-          action: d.accepted ? (d.editedText ? 'EDIT' : 'ACCEPT') : 'REJECT',
-          editedBody: d.editedText,
+          action: d.accepted
+            ? d.editedTitle || d.editedBody
+              ? 'EDIT'
+              : 'ACCEPT'
+            : 'REJECT',
+          editedTitle: d.editedTitle,
+          editedBody: d.editedBody,
         })),
         postComment,
       }
@@ -161,7 +289,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   return (
     <div className="flex gap-6">
-      {/* Main panel */}
+      {/* ── Main panel ─────────────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-white">PR Review</h1>
@@ -190,7 +318,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           )}
         </div>
 
-        {/* Findings list */}
+        {/* Findings placeholder while running */}
         {findings.length === 0 && status !== 'done' && (
           <div className="rounded-lg border border-gray-800 bg-gray-900 p-8 text-center text-sm text-gray-500">
             {status === 'connecting'
@@ -245,19 +373,43 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                 </div>
 
                 <p className="mt-2 text-sm font-medium text-gray-100">
-                  {f.title}
+                  {decisions[f.id]?.editedTitle ? (
+                    <span className="text-indigo-300">
+                      {decisions[f.id].editedTitle}
+                    </span>
+                  ) : (
+                    f.title
+                  )}
                 </p>
-                <p className="mt-1 text-sm text-gray-400">{f.body}</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {decisions[f.id]?.editedBody ?? f.body}
+                </p>
 
                 {isEditing ? (
-                  <div className="mt-3">
-                    <textarea
-                      className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                      rows={3}
-                      value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                    />
-                    <div className="mt-2 flex gap-2">
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        Description
+                      </label>
+                      <textarea
+                        className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                        rows={4}
+                        value={editBody}
+                        onChange={e => setEditBody(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
                       <button
                         onClick={() => saveEdit(f.id)}
                         className="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-500"
@@ -274,16 +426,16 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   </div>
                 ) : (
                   <>
-                    {(decision?.editedText ?? f.suggestedFix) && (
+                    {f.suggestedFix && (
                       <p className="mt-2 rounded bg-gray-800 px-3 py-2 font-mono text-xs text-green-400">
-                        {decision?.editedText ?? f.suggestedFix}
+                        {f.suggestedFix}
                       </p>
                     )}
                     <button
                       onClick={() => startEdit(f)}
                       className="mt-2 text-xs text-indigo-400 hover:underline"
                     >
-                      {decision?.editedText ? 'Edit fix' : 'Add fix'}
+                      Edit suggestion
                     </button>
                   </>
                 )}
@@ -319,31 +471,68 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
         )}
       </div>
 
-      {/* Event log sidebar */}
-      <div className="w-64 shrink-0 hidden lg:block">
-        <div className="sticky top-4 rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Event Log
-          </h2>
-          {events.length === 0 ? (
-            <p className="text-xs text-gray-600">No events yet</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {events.map((e, i) => (
-                <li
-                  key={`${i}-${e.slice(0, 20)}`}
-                  className="text-xs text-gray-400 font-mono"
-                >
-                  {e}
-                </li>
+      {/* ── Activity sidebar ───────────────────────────────────────────────── */}
+      <div className="w-72 shrink-0 hidden lg:block">
+        <div className="sticky top-4 space-y-4">
+          {/* Pipeline stages */}
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Pipeline
+              </h2>
+              <span
+                className={`text-xs font-mono tabular-nums ${status === 'done' ? 'text-green-500' : 'text-gray-500'}`}
+              >
+                {formatElapsed(elapsed)}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {PIPELINE.map(({ key, label }) => (
+                <PhaseRow
+                  key={key}
+                  label={label}
+                  status={phaseStatuses[key] ?? 'pending'}
+                />
               ))}
-            </ul>
-          )}
+            </div>
+          </div>
+
+          {/* Activity feed */}
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Activity
+            </h2>
+            <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
+              {activity.length === 0 ? (
+                <p className="text-xs text-gray-600">Waiting for events…</p>
+              ) : (
+                activity.map(item => (
+                  <p
+                    key={item.id}
+                    className={`text-xs font-mono leading-snug ${
+                      item.type === 'alarm'
+                        ? 'text-red-400'
+                        : item.type === 'finding'
+                          ? 'text-yellow-400'
+                          : item.type === 'phase'
+                            ? 'text-green-400'
+                            : 'text-gray-400'
+                    }`}
+                  >
+                    {item.text}
+                  </p>
+                ))
+              )}
+              <div ref={activityEndRef} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
   )
 }
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function StatusIndicator({ status }: { status: StreamStatus }) {
   const configs: Record<StreamStatus, { dot: string; label: string }> = {
@@ -358,5 +547,55 @@ function StatusIndicator({ status }: { status: StreamStatus }) {
       <span className={`h-2 w-2 rounded-full ${dot}`} />
       <span className="text-sm text-gray-400">{label}</span>
     </div>
+  )
+}
+
+function PhaseRow({ label, status }: { label: string; status: PhaseStatus }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <PhaseIcon status={status} />
+      <span
+        className={`text-xs ${
+          status === 'done'
+            ? 'text-gray-300'
+            : status === 'running'
+              ? 'text-white font-medium'
+              : 'text-gray-600'
+        }`}
+      >
+        {label}
+      </span>
+      {status === 'running' && (
+        <span className="ml-auto text-xs text-indigo-400 animate-pulse">
+          running
+        </span>
+      )}
+      {status === 'done' && (
+        <span className="ml-auto text-xs text-green-600">done</span>
+      )}
+    </div>
+  )
+}
+
+function PhaseIcon({ status }: { status: PhaseStatus }) {
+  if (status === 'done')
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-700 text-green-100 text-[9px] font-bold">
+        ✓
+      </span>
+    )
+  if (status === 'running')
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+    )
+  if (status === 'error')
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-700 text-red-100 text-[9px] font-bold">
+        ✗
+      </span>
+    )
+  // pending
+  return (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-gray-700" />
   )
 }

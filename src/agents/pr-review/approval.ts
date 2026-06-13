@@ -186,10 +186,9 @@ export function formatGitHubComment(
     for (const d of accepted) {
       const f = byId.get(d.findingId)
       if (!f || f.severity !== 'BLOCKING') continue
+      const title = d.editedTitle ?? f.title
       const body = d.editedBody ?? f.body
-      lines.push(
-        `\n**${f.title}** (\`${f.file}${f.line ? `:${f.line}` : ''}\`)`
-      )
+      lines.push(`\n**${title}** (\`${f.file}${f.line ? `:${f.line}` : ''}\`)`)
       lines.push(body)
       if (f.suggestedFix) lines.push(`\n> Suggested fix: ${f.suggestedFix}`)
     }
@@ -201,10 +200,9 @@ export function formatGitHubComment(
     for (const d of accepted) {
       const f = byId.get(d.findingId)
       if (!f || f.severity !== 'SUGGESTION') continue
+      const title = d.editedTitle ?? f.title
       const body = d.editedBody ?? f.body
-      lines.push(
-        `\n**${f.title}** (\`${f.file}${f.line ? `:${f.line}` : ''}\`)`
-      )
+      lines.push(`\n**${title}** (\`${f.file}${f.line ? `:${f.line}` : ''}\`)`)
       lines.push(body)
     }
     lines.push('')
