@@ -69,14 +69,7 @@ export class AnthropicClient implements ModelClient {
   }
 
   async chat(messages: Message[], tools: ToolDefinition[]): Promise<ModelReply> {
-    const anthropicMessages = messages
-      .filter((m) => m.role !== "tool")
-      .map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
-
-    // Inject tool results as user messages in Anthropic format
+    // Build Anthropic message array, injecting tool results as user messages
     const allMessages: Anthropic.MessageParam[] = [];
     for (const m of messages) {
       if (m.role === "tool" && m.toolCallId) {
@@ -150,6 +143,7 @@ export function createModelClient(options: {
   const apiKey = options.apiKey ?? "";
 
   if (provider === "anthropic") {
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required for provider=anthropic");
     return new AnthropicClient(apiKey, model);
   }
 

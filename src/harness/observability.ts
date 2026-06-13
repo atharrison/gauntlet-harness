@@ -4,7 +4,7 @@ import {
   type Span,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import type { ModelReply, TokenUsage } from "./models";
+import type { ModelReply } from "./models";
 
 // ── Tracer singleton ──────────────────────────────────────────────────────────
 
