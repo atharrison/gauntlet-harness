@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
  * GET /api/review/start?prUrl=...
  * Browser form fallback — redirects to the review page.
  */
+const GithubPrUrl = z.string().url().refine(
+  (val) => /^https:\/\/github\.com\/.+\/.+\/pull\/\d+/.test(val),
+  { message: "prUrl must be a GitHub PR URL" },
+);
+
 export function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const prUrl = searchParams.get("prUrl");
@@ -48,8 +53,13 @@ export function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?error=missing_pr_url", request.url));
   }
 
+  const parsed = GithubPrUrl.safeParse(prUrl);
+  if (!parsed.success) {
+    return NextResponse.redirect(new URL("/?error=invalid_pr_url", request.url));
+  }
+
   const reviewId = uuidv4();
   return NextResponse.redirect(
-    new URL(`/review/${reviewId}?prUrl=${encodeURIComponent(prUrl)}`, request.url),
+    new URL(`/review/${reviewId}?prUrl=${encodeURIComponent(parsed.data)}`, request.url),
   );
 }

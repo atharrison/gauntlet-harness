@@ -125,22 +125,27 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   async function handleSubmit(postComment: boolean) {
     setSubmitting(true);
-    const body = {
-      decisions: Object.values(decisions),
-      postComment,
-    };
-    const res = await fetch(`/api/review/${reviewId}/finalize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setSubmitResult(
-      res.ok
-        ? `Submitted: ${data.summary.accepted} accepted, ${data.summary.rejected} rejected`
-        : `Error: ${data.error}`,
-    );
-    setSubmitting(false);
+    try {
+      const body = {
+        decisions: Object.values(decisions),
+        postComment,
+      };
+      const res = await fetch(`/api/review/${reviewId}/finalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      setSubmitResult(
+        res.ok
+          ? `Submitted: ${data.summary.accepted} accepted, ${data.summary.rejected} rejected`
+          : `Error: ${data.error}`,
+      );
+    } catch {
+      setSubmitResult("Error: unexpected server response");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const accepted = Object.values(decisions).filter((d) => d.accepted).length;
@@ -311,7 +316,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
           ) : (
             <ul className="flex flex-col gap-1">
               {events.map((e, i) => (
-                <li key={i} className="text-xs text-gray-400 font-mono">
+                <li key={`${i}-${e.slice(0, 20)}`} className="text-xs text-gray-400 font-mono">
                   {e}
                 </li>
               ))}
