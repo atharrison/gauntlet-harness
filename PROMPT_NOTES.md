@@ -9,16 +9,16 @@ four-pillar framing we are implementing.
 
 > The model is the engine. The harness is the car.
 
-An LLM only maps tokens to tokens. Everything that makes it *useful and safe* —
+An LLM only maps tokens to tokens. Everything that makes it _useful and safe_ —
 memory, actions, retries, limits, logging — lives in the code wrapped around it.
 That wrapper is the harness.
 
-| Raw model call | Model + harness |
-|---|---|
-| One prompt in, one completion out | Multi-turn loop with state |
-| No memory of prior turns | Calls tools and reads results |
-| Can't take actions | Validated, bounded, retried |
-| No limits, no audit trail | Every step traced |
+| Raw model call                    | Model + harness               |
+| --------------------------------- | ----------------------------- |
+| One prompt in, one completion out | Multi-turn loop with state    |
+| No memory of prior turns          | Calls tools and reads results |
+| Can't take actions                | Validated, bounded, retried   |
+| No limits, no audit trail         | Every step traced             |
 
 ---
 
@@ -51,10 +51,10 @@ Lets the model read data and change the outside world.
 A tool is a typed function the model can request. The harness validates the
 arguments, executes it, and returns the result as the next message.
 
-| Part | Description |
-|------|-------------|
-| **Schema** | Name, description, and a typed parameter spec the model reads to decide how to call it |
-| **Executor** | Your real code — DB query, API call, file write — that runs when the model invokes the tool |
+| Part                | Description                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| **Schema**          | Name, description, and a typed parameter spec the model reads to decide how to call it             |
+| **Executor**        | Your real code — DB query, API call, file write — that runs when the model invokes the tool        |
 | **Result contract** | Return predictable, parseable output. Errors come back as data the model can react to, not crashes |
 
 Engineering concerns: idempotency, per-tool timeouts, retries with backoff, and
@@ -84,12 +84,12 @@ model and tool call so you can replay, alert, and score.
 
 The four signals that actually move reliability:
 
-| Signal | What it measures |
-|--------|-----------------|
-| **p95** | Latency per model call and per tool span |
-| **$/run** | Token cost — input + output, per trace |
-| **err%** | Tool error rate — failures and retries |
-| **eval** | Pass rate scored vs. a test set |
+| Signal    | What it measures                         |
+| --------- | ---------------------------------------- |
+| **p95**   | Latency per model call and per tool span |
+| **$/run** | Token cost — input + output, per trace   |
+| **err%**  | Tool error rate — failures and retries   |
+| **eval**  | Pass rate scored vs. a test set          |
 
 ---
 
@@ -111,11 +111,11 @@ Observability          Every step above emits a trace event for debugging, cost 
 
 Same four pillars, different tools and guardrails. Swap the toolset → new agent.
 
-| Agent | Tools | Guardrail |
-|-------|-------|-----------|
-| Coding agent | read/write files, run tests, grep | sandbox + diff review |
-| Research assistant | web search, fetch, cite | source allow-list + claim checks |
-| Support triage | ticket lookup, KB search, tag | human approval to reply |
-| Data copilot | SQL query, chart | read-only DB role + row limits |
-| Inbox agent | search mail, draft | draft-only, never auto-send |
-| Ops runbook | check status, restart | dry-run + on-call confirm |
+| Agent              | Tools                             | Guardrail                        |
+| ------------------ | --------------------------------- | -------------------------------- |
+| Coding agent       | read/write files, run tests, grep | sandbox + diff review            |
+| Research assistant | web search, fetch, cite           | source allow-list + claim checks |
+| Support triage     | ticket lookup, KB search, tag     | human approval to reply          |
+| Data copilot       | SQL query, chart                  | read-only DB role + row limits   |
+| Inbox agent        | search mail, draft                | draft-only, never auto-send      |
+| Ops runbook        | check status, restart             | dry-run + on-call confirm        |

@@ -1,21 +1,21 @@
-import Database from "better-sqlite3";
-import { randomUUID } from "crypto";
-import { mkdirSync } from "fs";
-import path from "path";
-import os from "os";
+import Database from 'better-sqlite3'
+import { randomUUID } from 'crypto'
+import { mkdirSync } from 'fs'
+import path from 'path'
+import os from 'os'
 import type {
   MemoryStore,
   Memory,
   ReviewRecord,
   CodeChunk,
   PRMetadata,
-} from "./store";
+} from './store'
 
 function dbPath(): string {
   return (
     process.env.SQLITE_DB_PATH ??
-    path.join(os.homedir(), ".gauntlet-harness", "memory.db")
-  );
+    path.join(os.homedir(), '.gauntlet-harness', 'memory.db')
+  )
 }
 
 function migrate(db: Database.Database): void {
@@ -39,19 +39,19 @@ function migrate(db: Database.Database): void {
       summary TEXT NOT NULL DEFAULT '',
       raw_json TEXT NOT NULL DEFAULT '{}'
     );
-  `);
+  `)
 }
 
 export class LocalMemoryStore implements MemoryStore {
-  private db: Database.Database;
+  private db: Database.Database
 
   constructor(dbFilePath?: string) {
-    const filePath = dbFilePath ?? dbPath();
-    mkdirSync(path.dirname(filePath), { recursive: true });
-    this.db = new Database(filePath);
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("foreign_keys = ON");
-    migrate(this.db);
+    const filePath = dbFilePath ?? dbPath()
+    mkdirSync(path.dirname(filePath), { recursive: true })
+    this.db = new Database(filePath)
+    this.db.pragma('journal_mode = WAL')
+    this.db.pragma('foreign_keys = ON')
+    migrate(this.db)
   }
 
   getMemories(context: string): Promise<Memory[]> {
@@ -63,22 +63,22 @@ export class LocalMemoryStore implements MemoryStore {
          ORDER BY created_at DESC`
       )
       .all(context) as Array<{
-      id: string;
-      content: string;
-      tags: string;
-      context: string;
-      created_at: string;
-    }>;
+      id: string
+      content: string
+      tags: string
+      context: string
+      created_at: string
+    }>
 
     return Promise.resolve(
-      rows.map((r) => ({
+      rows.map(r => ({
         id: r.id,
         content: r.content,
         tags: JSON.parse(r.tags),
         context: r.context,
         createdAt: r.created_at,
       }))
-    );
+    )
   }
 
   createMemory(content: string, tags: string[]): Promise<void> {
@@ -87,8 +87,13 @@ export class LocalMemoryStore implements MemoryStore {
         `INSERT INTO memories (id, content, tags, context, created_at)
          VALUES (?, ?, ?, '', ?)`
       )
-      .run(randomUUID(), content, JSON.stringify(tags), new Date().toISOString());
-    return Promise.resolve();
+      .run(
+        randomUUID(),
+        content,
+        JSON.stringify(tags),
+        new Date().toISOString()
+      )
+    return Promise.resolve()
   }
 
   searchReviews(query: string, topK = 5): Promise<ReviewRecord[]> {
@@ -103,19 +108,19 @@ export class LocalMemoryStore implements MemoryStore {
          LIMIT ?`
       )
       .all(`%${query}%`, `%${query}%`, topK) as Array<{
-      id: string;
-      pr_url: string;
-      repo_name: string;
-      pr_title: string;
-      author: string;
-      reviewed_at: string;
-      finding_count: number;
-      summary: string;
-      raw_json: string;
-    }>;
+      id: string
+      pr_url: string
+      repo_name: string
+      pr_title: string
+      author: string
+      reviewed_at: string
+      finding_count: number
+      summary: string
+      raw_json: string
+    }>
 
     return Promise.resolve(
-      rows.map((r) => ({
+      rows.map(r => ({
         id: r.id,
         prUrl: r.pr_url,
         repoName: r.repo_name,
@@ -126,11 +131,11 @@ export class LocalMemoryStore implements MemoryStore {
         summary: r.summary,
         rawJson: r.raw_json,
       }))
-    );
+    )
   }
 
   storeReview(review: unknown, metadata: PRMetadata): Promise<void> {
-    const reviewObj = review as { summary?: string; findings?: unknown[] };
+    const reviewObj = review as { summary?: string; findings?: unknown[] }
     this.db
       .prepare(
         `INSERT INTO review_history
@@ -145,18 +150,18 @@ export class LocalMemoryStore implements MemoryStore {
         metadata.author,
         new Date().toISOString(),
         Array.isArray(reviewObj?.findings) ? reviewObj.findings.length : 0,
-        reviewObj?.summary ?? "",
+        reviewObj?.summary ?? '',
         JSON.stringify(review)
-      );
-    return Promise.resolve();
+      )
+    return Promise.resolve()
   }
 
   // v2 stub — requires indexer background job
   searchCode(_query: string, _topK?: number): Promise<CodeChunk[]> {
-    return Promise.resolve([]);
+    return Promise.resolve([])
   }
 
   close(): void {
-    this.db.close();
+    this.db.close()
   }
 }

@@ -35,7 +35,7 @@ export function createMemoryTools(
       schema: SearchPastReviewsSchema,
       fn: async ({ query, topK }) => {
         const results = await store.searchReviews(query, topK)
-        return results.map((r) => ({
+        return results.map(r => ({
           id: r.id,
           prUrl: r.prUrl,
           prTitle: r.prTitle,

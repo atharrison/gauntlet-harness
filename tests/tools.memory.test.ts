@@ -38,7 +38,10 @@ describe('createMemoryTools', () => {
         },
       ])
       const tools = createMemoryTools(store)
-      const result = await tools.search_past_reviews.fn({ query: 'auth', topK: 5 })
+      const result = await tools.search_past_reviews.fn({
+        query: 'auth',
+        topK: 5,
+      })
       expect(store.searchReviews).toHaveBeenCalledWith('auth', 5)
       const reviews = result as Array<{ prTitle: string }>
       expect(reviews[0].prTitle).toBe('Add auth')
@@ -59,7 +62,10 @@ describe('createMemoryTools', () => {
       })
       expect(store.storeReview).toHaveBeenCalledWith(
         { findings: [] },
-        expect.objectContaining({ prUrl: 'https://github.com/org/repo/pull/1', prNumber: 1 })
+        expect.objectContaining({
+          prUrl: 'https://github.com/org/repo/pull/1',
+          prNumber: 1,
+        })
       )
       expect((result as { stored: boolean }).stored).toBe(true)
     })
@@ -73,7 +79,10 @@ describe('createMemoryTools', () => {
         content: 'Always use type hints',
         tags: ['python', 'style'],
       })
-      expect(store.createMemory).toHaveBeenCalledWith('Always use type hints', ['python', 'style'])
+      expect(store.createMemory).toHaveBeenCalledWith('Always use type hints', [
+        'python',
+        'style',
+      ])
       expect((result as { created: boolean }).created).toBe(true)
     })
   })

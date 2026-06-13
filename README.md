@@ -73,12 +73,12 @@ Nothing reaches the PR author until you've approved it.
 
 Signals designed for a review tool, not a generic agent harness.
 
-| Group | Key signals |
-|-------|-------------|
-| **Coverage** | `files_read/files_in_pr` · `lines_read/lines_in_pr` · `external_context_calls` |
-| **Cost** | `$/review` · `tokens_from_context` vs `tokens_from_diff` |
-| **Quality** | `findings_accepted/total` · `findings_edited` · `ticket_resolved` — harvested free from the approval UI, no labeling required |
-| **Health** | `turns_used/turns_max` · `tool_errors` |
+| Group        | Key signals                                                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Coverage** | `files_read/files_in_pr` · `lines_read/lines_in_pr` · `external_context_calls`                                                |
+| **Cost**     | `$/review` · `tokens_from_context` vs `tokens_from_diff`                                                                      |
+| **Quality**  | `findings_accepted/total` · `findings_edited` · `ticket_resolved` — harvested free from the approval UI, no labeling required |
+| **Health**   | `turns_used/turns_max` · `tool_errors`                                                                                        |
 
 Instrumented with **OpenTelemetry** — export to any compatible backend.
 
@@ -86,13 +86,13 @@ Instrumented with **OpenTelemetry** — export to any compatible backend.
 
 ## Pluggable by Design
 
-| Layer | Default | Swap via |
-|-------|---------|---------|
-| LLM | Anthropic Claude | `LLM_PROVIDER=openai` |
-| Git host | GitHub | GitLab *(planned)* |
-| Ticket tracker | Linear | `TicketClient` — Jira, GitHub Issues *(planned)* |
-| Memory | Supabase (team-shared) | `MEMORY_PROVIDER` env var |
-| Hosting | Vercel + Next.js | Any Node 20 host |
+| Layer          | Default                | Swap via                                         |
+| -------------- | ---------------------- | ------------------------------------------------ |
+| LLM            | Anthropic Claude       | `LLM_PROVIDER=openai`                            |
+| Git host       | GitHub                 | GitLab _(planned)_                               |
+| Ticket tracker | Linear                 | `TicketClient` — Jira, GitHub Issues _(planned)_ |
+| Memory         | Supabase (team-shared) | `MEMORY_PROVIDER` env var                        |
+| Hosting        | Vercel + Next.js       | Any Node 20 host                                 |
 
 TypeScript up and down the stack. No stack assumptions in the harness core.
 MVP ships with GitHub + Linear. Works for any team, any repo.
@@ -116,17 +116,17 @@ npm run review -- --quick https://github.com/org/repo/pull/123
 
 ### Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GITHUB_TOKEN` | Yes | GitHub personal access token (repo read scope) |
-| `LLM_API_KEY` | Yes | API key for your LLM provider |
-| `LLM_PROVIDER` | No | `anthropic` (default) · `openai` |
-| `LLM_MODEL` | No | Model name (defaults to latest Claude) |
-| `LINEAR_API_KEY` | No | Linear API key for ticket context |
-| `TICKET_PROVIDER` | No | `linear` (default) · `jira` *(planned)* |
-| `MEMORY_PROVIDER` | No | `supabase` (default) · `sqlite` |
-| `SUPABASE_URL` | If Supabase | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | If Supabase | Your Supabase anon key |
+| Variable            | Required    | Description                                    |
+| ------------------- | ----------- | ---------------------------------------------- |
+| `GITHUB_TOKEN`      | Yes         | GitHub personal access token (repo read scope) |
+| `LLM_API_KEY`       | Yes         | API key for your LLM provider                  |
+| `LLM_PROVIDER`      | No          | `anthropic` (default) · `openai`               |
+| `LLM_MODEL`         | No          | Model name (defaults to latest Claude)         |
+| `LINEAR_API_KEY`    | No          | Linear API key for ticket context              |
+| `TICKET_PROVIDER`   | No          | `linear` (default) · `jira` _(planned)_        |
+| `MEMORY_PROVIDER`   | No          | `supabase` (default) · `sqlite`                |
+| `SUPABASE_URL`      | If Supabase | Your Supabase project URL                      |
+| `SUPABASE_ANON_KEY` | If Supabase | Your Supabase anon key                         |
 
 ---
 

@@ -35,9 +35,7 @@ const DRY_RUN = process.env.DRY_RUN === 'true'
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
-export function createGithubTools(
-  octokit: Octokit
-): Record<string, ToolEntry> {
+export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
   return {
     fetch_pr_diff: {
       description:
@@ -65,7 +63,7 @@ export function createGithubTools(
           pull_number,
           per_page: 100,
         })
-        return data.map((c) => ({
+        return data.map(c => ({
           id: c.id,
           path: c.path,
           line: c.line,
@@ -87,14 +85,12 @@ export function createGithubTools(
           pull_number,
           per_page: 100,
         })
-        return data.map((f) => ({
+        return data.map(f => ({
           filename: f.filename,
           status: f.status,
           additions: f.additions,
           deletions: f.deletions,
-          patch: f.patch
-            ? f.patch.slice(0, FILE_CONTENT_MAX_BYTES)
-            : undefined,
+          patch: f.patch ? f.patch.slice(0, FILE_CONTENT_MAX_BYTES) : undefined,
           blobUrl: f.blob_url,
         }))
       },
@@ -106,7 +102,11 @@ export function createGithubTools(
       schema: PostReviewCommentSchema,
       fn: async ({ owner, repo, pull_number, body }) => {
         if (DRY_RUN) {
-          return { dryRun: true, message: 'DRY_RUN=true — comment not posted', body }
+          return {
+            dryRun: true,
+            message: 'DRY_RUN=true — comment not posted',
+            body,
+          }
         }
         const { data } = await octokit.issues.createComment({
           owner,

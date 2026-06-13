@@ -3,7 +3,10 @@ import { createTicketTools } from '../src/tools/tickets'
 describe('createTicketTools', () => {
   it('registers the expected 2 tools', () => {
     const tools = createTicketTools()
-    expect(Object.keys(tools).sort()).toEqual(['fetch_ticket', 'search_tickets'])
+    expect(Object.keys(tools).sort()).toEqual([
+      'fetch_ticket',
+      'search_tickets',
+    ])
   })
 
   describe('when LINEAR_API_KEY is not set', () => {

@@ -60,7 +60,9 @@ export function createTicketTools(): Record<string, ToolEntry> {
       schema: FetchTicketSchema,
       fn: async ({ ticketId }) => {
         if (!linear) {
-          return { error: 'LINEAR_API_KEY not configured — ticket fetch skipped' }
+          return {
+            error: 'LINEAR_API_KEY not configured — ticket fetch skipped',
+          }
         }
         const issue = await linear.issue(ticketId)
         return {
@@ -80,10 +82,12 @@ export function createTicketTools(): Record<string, ToolEntry> {
       schema: SearchTicketsSchema,
       fn: async ({ query, limit }) => {
         if (!linear) {
-          return { error: 'LINEAR_API_KEY not configured — ticket search skipped' }
+          return {
+            error: 'LINEAR_API_KEY not configured — ticket search skipped',
+          }
         }
         const result = await linear.issueSearch(query, { first: limit ?? 10 })
-        return result.nodes.map((n) => ({
+        return result.nodes.map(n => ({
           id: n.id,
           identifier: n.identifier,
           title: n.title,
