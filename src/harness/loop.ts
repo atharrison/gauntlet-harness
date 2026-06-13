@@ -88,13 +88,8 @@ export async function run(
       throw new TokenBudgetError(tokensUsed, maxTokens);
     }
 
-    let reply: ModelReply;
-    try {
-      reply = await model.chat(messages, tools);
-    } catch (e) {
-      // Surface as data so callers can decide — loop does not swallow
-      throw e;
-    }
+    // Model errors propagate to the caller — the loop does not swallow them
+    const reply: ModelReply = await model.chat(messages, tools);
 
     tokensUsed += reply.usage.inputTokens + reply.usage.outputTokens;
     totalCost += reply.cost;

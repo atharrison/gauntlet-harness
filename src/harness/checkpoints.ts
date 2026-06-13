@@ -67,15 +67,16 @@ export async function resumeFromCheckpoint<T>(
 export class InMemoryCheckpointStore implements CheckpointStore {
   private records = new Map<string, CheckpointRecord>();
 
-  async save(record: CheckpointRecord): Promise<void> {
+  save(record: CheckpointRecord): Promise<void> {
     this.records.set(`${record.reviewId}:${record.stage}:${record.agentName ?? ""}`, record);
+    return Promise.resolve();
   }
 
-  async load(reviewId: string, stage: CheckpointStage): Promise<CheckpointRecord | null> {
+  load(reviewId: string, stage: CheckpointStage): Promise<CheckpointRecord | null> {
     for (const [key, record] of this.records) {
-      if (key.startsWith(`${reviewId}:${stage}:`)) return record;
+      if (key.startsWith(`${reviewId}:${stage}:`)) return Promise.resolve(record);
     }
-    return null;
+    return Promise.resolve(null);
   }
 }
 

@@ -104,7 +104,7 @@ export class SupabaseMemoryStore implements MemoryStore {
   }
 
   // v2 stub — pgvector similarity search (requires embeddings pipeline)
-  async searchCode(_query: string, _topK?: number): Promise<CodeChunk[]> {
-    return [];
+  searchCode(_query: string, _topK?: number): Promise<CodeChunk[]> {
+    return Promise.resolve([]);
   }
 }

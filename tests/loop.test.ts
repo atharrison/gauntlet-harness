@@ -1,5 +1,5 @@
 import { run, TurnLimitError, TokenBudgetError } from "../src/harness/loop";
-import type { ModelClient, ModelReply, ToolDefinition, ToolCall, Message } from "../src/harness/models";
+import type { ModelClient, ModelReply, ToolCall, Message } from "../src/harness/models";
 
 // Silence alarm stderr output in tests
 beforeEach(() => {
@@ -73,7 +73,7 @@ describe("run — hard stops", () => {
 
   it("throws TokenBudgetError when cumulative tokens exceed limit", async () => {
     // Each reply uses 1000 tokens; limit is 500
-    const model = makeModel([
+    const _model = makeModel([
       makeReply({ usage: { inputTokens: 600, outputTokens: 600 }, toolCalls: [] }),
     ]);
     // First turn: tokens = 1200 > 500 → but check happens before the call on turn > 0

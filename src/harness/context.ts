@@ -13,7 +13,7 @@
 import { createModelClient, type ModelClient } from "./models";
 import { createMemoryStore, type MemoryStore } from "../memory/index";
 import { InMemoryCheckpointStore, type CheckpointStore } from "./checkpoints";
-import { dispatch, toToolDefinitions, type ToolRegistry } from "./tools";
+import { dispatch, type ToolRegistry } from "./tools";
 import type { ToolDispatcher } from "./loop";
 
 // ── ReviewDeps — all injectable dependencies ──────────────────────────────────

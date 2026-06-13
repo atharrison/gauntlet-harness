@@ -54,7 +54,7 @@ export class LocalMemoryStore implements MemoryStore {
     migrate(this.db);
   }
 
-  async getMemories(context: string): Promise<Memory[]> {
+  getMemories(context: string): Promise<Memory[]> {
     const rows = this.db
       .prepare(
         `SELECT id, content, tags, context, created_at
@@ -70,25 +70,28 @@ export class LocalMemoryStore implements MemoryStore {
       created_at: string;
     }>;
 
-    return rows.map((r) => ({
-      id: r.id,
-      content: r.content,
-      tags: JSON.parse(r.tags),
-      context: r.context,
-      createdAt: r.created_at,
-    }));
+    return Promise.resolve(
+      rows.map((r) => ({
+        id: r.id,
+        content: r.content,
+        tags: JSON.parse(r.tags),
+        context: r.context,
+        createdAt: r.created_at,
+      }))
+    );
   }
 
-  async createMemory(content: string, tags: string[]): Promise<void> {
+  createMemory(content: string, tags: string[]): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO memories (id, content, tags, context, created_at)
          VALUES (?, ?, ?, '', ?)`
       )
       .run(randomUUID(), content, JSON.stringify(tags), new Date().toISOString());
+    return Promise.resolve();
   }
 
-  async searchReviews(query: string, topK = 5): Promise<ReviewRecord[]> {
+  searchReviews(query: string, topK = 5): Promise<ReviewRecord[]> {
     // SQLite full-text search via LIKE; vector search is Supabase-only
     const rows = this.db
       .prepare(
@@ -111,20 +114,22 @@ export class LocalMemoryStore implements MemoryStore {
       raw_json: string;
     }>;
 
-    return rows.map((r) => ({
-      id: r.id,
-      prUrl: r.pr_url,
-      repoName: r.repo_name,
-      prTitle: r.pr_title,
-      author: r.author,
-      reviewedAt: r.reviewed_at,
-      findingCount: r.finding_count,
-      summary: r.summary,
-      rawJson: r.raw_json,
-    }));
+    return Promise.resolve(
+      rows.map((r) => ({
+        id: r.id,
+        prUrl: r.pr_url,
+        repoName: r.repo_name,
+        prTitle: r.pr_title,
+        author: r.author,
+        reviewedAt: r.reviewed_at,
+        findingCount: r.finding_count,
+        summary: r.summary,
+        rawJson: r.raw_json,
+      }))
+    );
   }
 
-  async storeReview(review: unknown, metadata: PRMetadata): Promise<void> {
+  storeReview(review: unknown, metadata: PRMetadata): Promise<void> {
     const reviewObj = review as { summary?: string; findings?: unknown[] };
     this.db
       .prepare(
@@ -143,11 +148,12 @@ export class LocalMemoryStore implements MemoryStore {
         reviewObj?.summary ?? "",
         JSON.stringify(review)
       );
+    return Promise.resolve();
   }
 
   // v2 stub — requires indexer background job
-  async searchCode(_query: string, _topK?: number): Promise<CodeChunk[]> {
-    return [];
+  searchCode(_query: string, _topK?: number): Promise<CodeChunk[]> {
+    return Promise.resolve([]);
   }
 
   close(): void {
