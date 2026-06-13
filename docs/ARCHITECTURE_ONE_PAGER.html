@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PR Review Agent — Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0d1117; color: #e6edf3;
+    font-size: 12px; line-height: 1.55;
+    padding: 28px 36px; max-width: 960px; margin: 0 auto;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 { font-size: 24px; font-weight: 700; color: #ff6b2b; letter-spacing: -0.5px; margin-bottom: 4px; }
+  h1 + p { font-size: 12.5px; color: #c9d1d9; margin-bottom: 16px; line-height: 1.6; }
+  h1 + p strong { color: #e6edf3; }
+  h2 {
+    font-size: 12px; font-weight: 700; color: #ff6b2b;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin: 18px 0 8px; border-bottom: 1px solid #21262d; padding-bottom: 4px;
+  }
+  p { margin-bottom: 8px; color: #c9d1d9; }
+  pre {
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 10px 14px; font-size: 11px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    color: #79c0ff; overflow-x: auto; margin-bottom: 10px; line-height: 1.5;
+  }
+  code {
+    background: #161b22; border: 1px solid #30363d; border-radius: 3px;
+    padding: 1px 5px; font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 11px; color: #79c0ff;
+  }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11.5px; }
+  th {
+    background: #161b22; color: #8b949e; text-align: left;
+    padding: 5px 10px; border: 1px solid #30363d;
+    font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  td { padding: 5px 10px; border: 1px solid #30363d; color: #c9d1d9; vertical-align: top; }
+  td code { font-size: 10.5px; }
+  tr:hover td { background: #161b22; }
+  hr { border: none; border-top: 1px solid #21262d; margin: 16px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .mode-card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 8px 12px; font-size: 11px;
+  }
+  .mode-card .mode-title { font-weight: 700; color: #e6edf3; margin-bottom: 3px; }
+  .mode-card .mode-desc { color: #8b949e; font-size: 10.5px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-right: 3px; }
+  .badge-dev  { background: #1f2937; color: #79c0ff; border: 1px solid #374151; }
+  .badge-prod { background: #1c2e1f; color: #56d364; border: 1px solid #2ea043; }
+  .badge-quick { background: #2d1f0a; color: #f0883e; border: 1px solid #bd561d; }
+  .callout {
+    background: #161b22; border: 1px solid #30363d; border-left: 3px solid #ff6b2b;
+    border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; font-size: 11px; color: #c9d1d9;
+  }
+  .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #21262d; font-size: 10px; color: #484f58; display: flex; justify-content: space-between; }
+  strong { color: #e6edf3; }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    @page { size: letter; margin: 0.4in; }
+    body {
+      background: #0d1117 !important; color: #e6edf3 !important;
+      font-size: 10px !important; padding: 0 !important;
+      max-width: 100% !important;
+    }
+    h1 { font-size: 18px !important; margin-bottom: 2px !important; }
+    h1 + p { font-size: 10.5px !important; margin-bottom: 8px !important; }
+    h2 { font-size: 10px !important; margin: 10px 0 5px !important; }
+    hr { margin: 8px 0 !important; }
+    .grid { gap: 12px !important; }
+    pre { font-size: 9.5px !important; padding: 7px 10px !important; margin-bottom: 6px !important; }
+    table { font-size: 10px !important; }
+    th, td { padding: 3px 7px !important; }
+    .mode-row { gap: 6px !important; margin-bottom: 6px !important; }
+    .mode-card { padding: 5px 8px !important; }
+    .callout { padding: 5px 8px !important; margin-bottom: 6px !important; }
+    p { margin-bottom: 5px !important; }
+    .footer { margin-top: 10px !important; padding-top: 6px !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>PR Review Agent</h1>
+<p><strong>AI-assisted pull request review with human-in-the-loop approval.</strong>
+Paste a PR URL, watch five specialized agents review it in parallel, then step
+through findings before anything reaches your team. Gets smarter with every
+review it runs — past reviews and team standards are injected as context automatically.</p>
+
+<hr>
+
+<div class="grid">
+<div>
+
+<h2>How It Works</h2>
+
+<div class="mode-row">
+  <div class="mode-card">
+    <div class="mode-title">🌐 Web</div>
+    <div class="mode-desc">Paste PR URL → agents run → curate findings in approval UI → submit to GitHub.</div>
+  </div>
+  <div class="mode-card">
+    <div class="mode-title">⌨️ CLI</div>
+    <div class="mode-desc">Same harness, same memory — an alternative interface for local workflows.</div>
+  </div>
+</div>
+
+<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 14px;font-size:11px;font-family:'SF Mono','Fira Code',monospace;color:#8b949e;margin-bottom:10px;line-height:1.6;">
+  <div>Fetching PR #123 · branch: feat/ENG-456-add-payment-retry</div>
+  <div>Resolved ticket: ENG-456 — Add retry logic for failed payments</div>
+  <div style="margin-bottom:8px;">Reading 12 changed files ...</div>
+
+  <div style="border:1px solid #30363d;border-radius:4px;overflow:hidden;">
+    <div style="background:#21262d;padding:4px 10px;color:#8b949e;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;">Review Draft</div>
+    <div style="padding:6px 10px;border-bottom:1px solid #21262d;">
+      <span style="color:#f85149;font-weight:700;">BLOCKING</span>
+      <span style="color:#c9d1d9;"> — PaymentService.ts:88</span>
+      <div style="color:#8b949e;padding-left:0;margin-top:2px;">Retry loop has no backoff — will hammer API on failure</div>
+    </div>
+    <div style="padding:6px 10px;">
+      <span style="color:#d29922;font-weight:700;">SUGGESTION</span>
+      <span style="color:#c9d1d9;"> — auth/middleware.ts:44</span>
+      <div style="color:#8b949e;margin-top:2px;">Token expiry not checked before use</div>
+    </div>
+  </div>
+
+  <div style="margin-top:8px;color:#79c0ff;">Web: &#x2611; findings, edit inline → Submit Review → GitHub PR</div>
+  <div style="color:#79c0ff;">CLI: [A]ccept [R]eject [E]dit → reviews/&lt;ticket&gt;_&lt;date&gt;.md</div>
+</div>
+
+<p>For each changed file: <strong>correctness · ticket alignment · security ·
+performance · test coverage · documentation.</strong> Criteria live in user-configured
+memories — stack rules added once, applied to every future review.</p>
+<p style="color:#8b949e;font-size:11px;">Nothing reaches the PR author until you've approved it.</p>
+
+<h2>Observability</h2>
+<p style="font-size:11px;color:#8b949e;margin-bottom:6px;">Signals designed for a review tool, not a generic agent harness.</p>
+<table>
+  <tr><th>Group</th><th>Key signals</th></tr>
+  <tr><td><strong>Coverage</strong></td><td><code>files_read/files_in_pr</code> · <code>lines_read/lines_in_pr</code> · <code>external_context_calls</code></td></tr>
+  <tr><td><strong>Cost</strong></td><td><code>$/review</code> · <code>tokens_from_context</code> vs <code>tokens_from_diff</code></td></tr>
+  <tr><td><strong>Quality</strong></td><td><code>findings_accepted/total</code> · <code>findings_edited</code> · <code>ticket_resolved</code><br><span style="color:#8b949e;font-size:10.5px;">Harvested free from the approval step — no labeling required.</span></td></tr>
+  <tr><td><strong>Health</strong></td><td><code>turns_used/turns_max</code> · <code>tool_errors</code></td></tr>
+</table>
+<p>Instrumented with <strong>OpenTelemetry</strong> — export to any compatible backend.</p>
+
+</div>
+<div>
+
+<h2>Architecture</h2>
+
+<div style="font-size:10.5px;">
+  <!-- Memory Store -->
+  <div style="display:flex;gap:4px;margin-bottom:6px;">
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 8px;text-align:center;color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Memory Store</div>
+  </div>
+  <div style="display:flex;gap:4px;margin-bottom:6px;">
+    <div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:4px 8px;text-align:center;color:#8b949e;font-size:10px;">Code Index <span style="color:#484f58;">(v2)</span></div>
+    <div style="flex:1;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:4px 8px;text-align:center;color:#c9d1d9;font-size:10px;">Review History</div>
+    <div style="flex:1;background:#7b899e;border:1px solid #21262d;border-radius:4px;padding:4px 8px;text-align:center;color:#c9d1d9;font-size:10px;">Memories</div>
+  </div>
+
+  <!-- Arrow down -->
+  <div style="text-align:center;color:#484f58;margin-bottom:4px;font-size:13px;">↓</div>
+
+  <!-- Context Agent -->
+  <div style="background:#1c2333;border:1px solid #ff6b2b44;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:4px;">
+    <span style="color:#ff6b2b;font-weight:700;">Context Agent</span>
+    <span style="color:#484f58;font-size:10px;margin-left:6px;">full loop · tool calls · EnrichedContext</span>
+  </div>
+
+  <!-- Arrow down -->
+  <div style="text-align:center;color:#484f58;margin-bottom:4px;font-size:13px;">↓</div>
+
+  <!-- Domain agents -->
+  <div style="display:flex;gap:3px;margin-bottom:4px;">
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 4px;text-align:center;color:#c9d1d9;font-size:10px;">Style</div>
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 4px;text-align:center;color:#c9d1d9;font-size:10px;">Conventions</div>
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 4px;text-align:center;color:#c9d1d9;font-size:10px;">Correctness</div>
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 4px;text-align:center;color:#c9d1d9;font-size:10px;">Security</div>
+    <div style="flex:1;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:5px 4px;text-align:center;color:#c9d1d9;font-size:10px;">Performance</div>
+  </div>
+  <div style="text-align:center;color:#484f58;font-size:10px;margin-bottom:4px;">single-shot structured output · parallel · DomainResult[]</div>
+
+  <!-- Arrow down -->
+  <div style="text-align:center;color:#484f58;margin-bottom:4px;font-size:13px;">↓</div>
+
+  <!-- Coordinator -->
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:4px;">
+    <span style="color:#e6edf3;font-weight:700;">Coordinator</span>
+    <span style="color:#484f58;font-size:10px;margin-left:6px;">dedup · calibrate · sort · PRReview (Zod-validated)</span>
+  </div>
+
+  <!-- Arrow down -->
+  <div style="text-align:center;color:#484f58;margin-bottom:4px;font-size:13px;">↓</div>
+
+  <!-- Output -->
+  <div style="display:flex;gap:4px;">
+    <div style="flex:1;background:#1c2e1f;border:1px solid #2ea04344;border-radius:4px;padding:5px 8px;text-align:center;color:#56d364;font-size:10px;">🌐 Approval UI → Supabase → GitHub PR</div>
+    <div style="flex:1;background:#1f2937;border:1px solid #37415144;border-radius:4px;padding:5px 8px;text-align:center;color:#79c0ff;font-size:10px;">⌨️ Approval Loop → reviews/ → GitHub PR</div>
+  </div>
+</div>
+
+<div class="callout">
+  <span class="badge badge-quick">⚡ quick</span>
+  <code>--quick</code> skips Context Agent, runs Correctness + Security only,
+  surfaces BLOCKING findings in ~30 seconds.
+</div>
+
+<p style="font-size:11px;margin-bottom:6px;"><strong>Loop:</strong> <span style="color:#8b949e;">Context Agent runs a full tool-call loop (build context → call model → run tool → append → repeat). Domain agents are single-shot structured output — no loop, predictable cost.</span></p>
+
+<p style="font-size:11px;margin-bottom:6px;"><strong>Tools:</strong> <code>fetch_pr_diff</code> · <code>fetch_pr_files</code> · <code>fetch_ticket</code> · <code>search_past_reviews</code> · <code>search_codebase</code> · <code>store_review</code> · <code>create_memory</code> · <code>post_review_comment</code></p>
+
+<p style="font-size:11px;color:#8b949e;"><strong style="color:#e6edf3;">Guardrails:</strong>
+GitHub and ticket tracker are read-only. <code>post_review_comment</code> is the only
+write, gated behind the approval step. File citation check, secret pattern scan,
+and scope-creep budget enforced on every run.</p>
+
+<h2>Pluggable by Design</h2>
+<table>
+  <tr><th>Layer</th><th>Default</th><th>Swap via</th></tr>
+  <tr><td>LLM</td><td>Anthropic Claude</td><td><code>LLM_PROVIDER=openai</code></td></tr>
+  <tr><td>Git host</td><td>GitHub</td><td>GitLab <em>(planned)</em></td></tr>
+  <tr><td>Ticket tracker</td><td>Linear</td><td>Jira, GitHub Issues <em>(planned)</em></td></tr>
+  <tr><td>Memory</td><td>SQLite (CLI) · Supabase (web)</td><td><code>MEMORY_PROVIDER</code> env var</td></tr>
+  <tr><td>Hosting</td><td>Vercel (web) · local Node (CLI)</td><td>Any Node 20 host</td></tr>
+</table>
+<p style="font-size:11px;color:#8b949e;">TypeScript up and down the stack. No stack assumptions in the harness core.
+MVP ships with GitHub + Linear. Works for any team, any repo.</p>
+
+</div>
+</div>
+
+<div class="footer">
+  <span>gauntlet-harness · TypeScript · Next.js · Vercel · Supabase</span>
+  <span>web + CLI · github + linear MVP · any LLM via ModelClient</span>
+</div>
+
+</body>
+</html>
