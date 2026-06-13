@@ -34,6 +34,10 @@ export function cacheReview(
   }
 }
 
+export function invalidateCachedReview(reviewId: string): void {
+  cache.delete(reviewId)
+}
+
 export function getCachedReview(reviewId: string): CacheEntry | undefined {
   const entry = cache.get(reviewId)
   if (!entry) return undefined

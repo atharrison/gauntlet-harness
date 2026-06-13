@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getCachedReview } from '../../../../../src/harness/review-cache'
-import { createReviewContext } from '../../../../../src/harness/context'
+import { getCachedReview, invalidateCachedReview } from '../../../../../src/harness/review-cache'
+import { createMemoryStore } from '../../../../../src/memory/index'
 import {
   formatGitHubComment,
   buildSubmission,
@@ -79,18 +79,13 @@ export async function POST(
   )
 
   // ── Persist to memory store ───────────────────────────────────────────────
-  const { deps } = createReviewContext()
-  const allFindings = [
-    ...review.blockingIssues,
-    ...review.suggestions,
-    ...review.nits,
-  ]
+  const memory = createMemoryStore()
   const accepted = rawDecisions.filter(d => d.action !== 'REJECT').length
   const rejected = rawDecisions.filter(d => d.action === 'REJECT').length
 
   const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
 
-  await deps.memory
+  await memory
     .storeReview(
       { review, submission },
       {
@@ -140,11 +135,14 @@ export async function POST(
     }
   }
 
+  // Invalidate cache so the review cannot be double-submitted
+  invalidateCachedReview(reviewId)
+
   return NextResponse.json({
     reviewId,
     status: 'finalized',
     summary: {
-      total: allFindings.length,
+      totalDecisions: rawDecisions.length,
       accepted,
       rejected,
     },
