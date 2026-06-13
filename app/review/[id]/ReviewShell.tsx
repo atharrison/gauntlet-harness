@@ -221,8 +221,12 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     })
 
     es.addEventListener('stats', e => {
-      const data = JSON.parse((e as MessageEvent).data)
-      setRunStats(data)
+      try {
+        const data = JSON.parse((e as MessageEvent).data)
+        setRunStats(data)
+      } catch {
+        // malformed stats payload — degrade gracefully, don't crash the handler
+      }
     })
 
     es.addEventListener('error', e => {

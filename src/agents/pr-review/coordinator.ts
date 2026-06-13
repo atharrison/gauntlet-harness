@@ -166,6 +166,7 @@ async function _runReview(
     }
   )
   totalTokens += correctnessResult.tokensUsed + securityResult.tokensUsed
+  totalCost += correctnessResult.cost + securityResult.cost
   phaseDurations.DOMAIN = Date.now() - domainStart
 
   // ── Phase 3: Merge ────────────────────────────────────────────────────────

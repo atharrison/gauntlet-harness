@@ -36,7 +36,8 @@ export async function runCorrectnessAgent(
     reply.text,
     'CORRECTNESS',
     durationMs,
-    reply.usage.inputTokens + reply.usage.outputTokens
+    reply.usage.inputTokens + reply.usage.outputTokens,
+    reply.cost
   )
 }
 
@@ -46,7 +47,8 @@ function parseDomainResult(
   text: string,
   domain: DomainResult['domain'],
   durationMs: number,
-  tokensUsed: number
+  tokensUsed: number,
+  cost: number
 ): DomainResult {
   const cleaned = text
     .replace(/^```(?:json)?\n?/m, '')
@@ -71,6 +73,7 @@ function parseDomainResult(
         domain,
         durationMs,
         tokensUsed,
+        cost,
       })
       if (result.success) return result.data
     } catch {
@@ -90,6 +93,7 @@ function parseDomainResult(
     findings: [],
     confidence: 0,
     tokensUsed,
+    cost,
     durationMs,
   }
 }

@@ -75,6 +75,7 @@ export const DomainResultSchema = z.object({
   findings: z.array(FindingSchema),
   confidence: z.number().min(0).max(1),
   tokensUsed: z.number().int().nonnegative(),
+  cost: z.number().nonnegative().default(0),
   durationMs: z.number().int().nonnegative(),
 })
 export type DomainResult = z.infer<typeof DomainResultSchema>
