@@ -15,7 +15,7 @@ Run `npm test` after each Stream completes before moving to the next phase.
 
 ---
 
-## 🔒 Phase 1 — Foundation (sequential, ~30 min)
+## 🔒 Phase 1 — Foundation (sequential, ~30 min) · [FIR-1](https://linear.app/atharrison/issue/FIR-1)
 Everything depends on this. Start here.
 
 - [ ] **1.1** Directory scaffold: `app/`, `src/harness/`, `src/memory/`, `src/agents/pr-review/`, `src/cli/`, `tests/`, `reviews/`
@@ -29,7 +29,7 @@ Everything depends on this. Start here.
 
 ## ⚡ Phase 2+3 — Harness Core & Memory Layer (parallel after Phase 1)
 
-### Stream A — Harness Core (`src/harness/`)
+### Stream A — Harness Core (`src/harness/`) · [FIR-2](https://linear.app/atharrison/issue/FIR-2)
 - [ ] **A.1** `models.ts` — `ModelClient` interface + Anthropic adapter
   - [ ] `tests/models.test.ts` — mock adapter returns expected `ModelReply` shape
 - [ ] **A.2** `loop.ts` — agent loop: `maxTurns`, `maxTokens`, `timeoutMs` hard stops; fires alarms on breach
@@ -43,7 +43,7 @@ Everything depends on this. Start here.
 - [ ] **A.6** `observability.ts` — OTel tracer setup, `tracedModelCall()`, `recordApprovalDecision()`
   - [ ] `tests/observability.test.ts` — `tracedModelCall()` attaches token + cost attributes to span
 
-### Stream B — Memory Layer (`src/memory/`)
+### Stream B — Memory Layer (`src/memory/`) · [FIR-3](https://linear.app/atharrison/issue/FIR-3)
 - [ ] **B.1** `store.ts` — `MemoryStore` interface
 - [ ] **B.2** `supabase.ts` — `SupabaseMemoryStore` (`memories`, `review_history`, `review_checkpoints` tables)
 - [ ] **B.3** `local.ts` — `LocalMemoryStore` (SQLite, CLI fallback)
@@ -53,12 +53,12 @@ Everything depends on this. Start here.
 
 ## ⚡ Phase 4+5a — Tools & Web Shell (parallel after A.3 ToolRegistry type exists)
 
-### Stream C — Tool Implementations
+### Stream C — Tool Implementations · [FIR-4](https://linear.app/atharrison/issue/FIR-4)
 - [ ] **C.1** GitHub tools: `fetch_pr_diff`, `fetch_pr_comments`, `fetch_pr_files`, `post_review_comment`
 - [ ] **C.2** Memory tools: `search_past_reviews`, `store_review`, `create_memory`
 - [ ] **C.3** Ticket tools: `fetch_ticket` (Linear adapter), `search_tickets`
 
-### Stream D — Web Shell (stub routes now, wire agents later)
+### Stream D — Web Shell (stub routes now, wire agents later) · [FIR-5](https://linear.app/atharrison/issue/FIR-5)
 - [ ] **D.1** `next.config.ts` (`output: "standalone"`), `app/layout.tsx`, `app/page.tsx`
 - [ ] **D.2** Supabase SSR middleware — copy + adapt `middleware.ts` + auth route from operation-salamander
 - [ ] **D.3** `app/api/review/start/route.ts` — stub (returns `{ reviewId }`)
@@ -68,7 +68,7 @@ Everything depends on this. Start here.
 
 ---
 
-## 🔒 Phase 5b — Agents (sequential after A + B + C complete)
+## 🔒 Phase 5b — Agents (sequential after A + B + C complete) · [FIR-6](https://linear.app/atharrison/issue/FIR-6)
 - [ ] **5.1** `src/agents/pr-review/prompts.ts` — system prompts + domain instruction blocks *(can draft during Phase 4)*
 - [ ] **5.2** `src/agents/pr-review/context-agent.ts` — full loop, tool calls, produces `EnrichedContext`
 - [ ] **5.3** `src/agents/pr-review/correctness-agent.ts` — single-shot structured output *(parallel with 5.4)*
@@ -82,12 +82,12 @@ Everything depends on this. Start here.
 
 ## ⚡ Phase 6 — Wire + Deploy (parallel tracks after Phase 5b)
 
-### Stream E — Wire Agents into Web Routes
+### Stream E — Wire Agents into Web Routes · [FIR-8](https://linear.app/atharrison/issue/FIR-8)
 - [ ] **E.1** Wire `start` route → coordinator, persist `reviewId` to Supabase
 - [ ] **E.2** Wire SSE route → stream `DomainResult` + `Alarm` events as agents complete
 - [ ] **E.3** Wire `finalize` route → `store_review`, optionally `post_review_comment`
 
-### Stream F — Railway
+### Stream F — Railway · [FIR-8](https://linear.app/atharrison/issue/FIR-8)
 - [ ] **F.1** `Dockerfile` — copy + adapt from operation-salamander frontend (Node 22 Alpine, standalone)
 - [ ] **F.2** Create Railway project, configure env vars:
   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -97,7 +97,7 @@ Everything depends on this. Start here.
 
 ---
 
-## 🔒 Phase 7 — Demo Polish (sequential, end of day)
+## 🔒 Phase 7 — Demo Polish (sequential, end of day) · [FIR-7](https://linear.app/atharrison/issue/FIR-7)
 - [ ] **7.1** End-to-end run against `python-adventofcode2020` PR #1 — verify findings hit known smells
   - Expected: no type hints/docstrings, debug prints, magic `'x'` string, undocumented CRT assumption, duplicate list filtering
 - [ ] **7.2** `--quick` mode verified: Correctness + Security only, ~30 sec, BLOCKING findings only
