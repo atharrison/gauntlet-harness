@@ -91,7 +91,7 @@ function tryParseEnrichedContext(
 
   // Graceful degradation: return a minimal context with whatever we have
   console.warn(
-    `[context-agent][${reviewId}] Failed to parse EnrichedContext JSON — using minimal fallback`
+    `[context-agent][${reviewId}] Failed to parse EnrichedContext JSON — using minimal fallback. Raw output (first 500 chars): ${text.slice(0, 500)}`
   )
   return {
     prUrl,

@@ -118,6 +118,30 @@ Everything depends on this. Start here.
 
 ---
 
+## 🗂 Phase 8 — Review History (post-demo feature requests)
+
+> Single-user demo mode (no auth filtering). All reviews on the instance are visible.
+> `review_history` SQLite table is already populated on every `finalize`.
+
+- [ ] **8.1** `GET /api/history` — list all `ReviewRecord` rows, newest first (limit 50)
+- [ ] **8.2** `/history` page — table of past reviews: repo, PR title, date, finding count, summary
+- [ ] **8.3** Link each row back to `/review/{id}` (cache replay if still warm, re-run if expired)
+- [ ] **8.4** Add "History" nav link to global header (`app/layout.tsx`)
+
+---
+
+## 🔐 Phase 9 — Authentication (post-demo feature requests)
+
+> Currently auth middleware is disabled for demo. Re-enabling requires schema changes.
+
+- [ ] **9.1** Add `user_id` column to `review_history` SQLite table (migration)
+- [ ] **9.2** Re-enable Supabase SSR auth middleware (`middleware.ts`) to protect `/review/*` and `/history`
+- [ ] **9.3** Filter `/api/history` results by authenticated user
+- [ ] **9.4** Associate finalized reviews with the logged-in user (pass user_id through finalize route)
+- [ ] **9.5** Login/logout UI in the header
+
+---
+
 ## Reference
 
 ### Demo target

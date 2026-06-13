@@ -78,7 +78,7 @@ function parseDomainResult(
   }
 
   console.warn(
-    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON`
+    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON. Raw output (first 500 chars): ${text.slice(0, 500)}`
   )
   return {
     domain,
