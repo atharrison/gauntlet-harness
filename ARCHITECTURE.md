@@ -437,6 +437,112 @@ focused on the PR diff.
 
 ---
 
+## Checkpoints
+
+Checkpoints are discrete pass/fail gates that run at defined stage boundaries.
+Unlike guardrails (which constrain the agent's *actions*), checkpoints evaluate
+the agent's *outputs* and decide whether the run may proceed. A failed checkpoint
+stops the run with a structured error — the agent never sees a partial result
+promoted downstream.
+
+### Checkpoint stages
+
+```
+[1] Input Checkpoint      — before the Context Agent starts
+[2] Context Checkpoint    — after Context Agent produces EnrichedContext
+[3] Domain Checkpoint     — after each domain agent produces DomainResult
+[4] Output Checkpoint     — after Coordinator merges all DomainResults
+[5] Finalize Checkpoint   — before writing to disk and posting to GitHub
+```
+
+| Checkpoint | Pass criteria | Fail behaviour |
+|---|---|---|
+| **Input** | PR URL resolves; diff is non-empty; PR size within budget | Abort with `PR_TOO_LARGE` or `PR_NOT_FOUND` alarm |
+| **Context** | `EnrichedContext` parses against Zod schema; at least diff present | Domain agents receive partial context; alarm emitted |
+| **Domain** | `DomainResult` parses against Zod schema; confidence ≥ 0.0 | That domain's findings excluded from merge; alarm emitted |
+| **Output** | `PRReview` parses against Zod schema; file citations valid; no secrets | Run fails with `SCHEMA_VALIDATION_FAILED` or `SECRET_DETECTED` alarm |
+| **Finalize** | User has explicitly confirmed findings in approval loop | Post to GitHub blocked until confirmed |
+
+### Checkpoint persistence (replay support)
+
+Each checkpoint result is written to the `review_checkpoints` Supabase table as
+it passes. A run interrupted after the Domain Checkpoint can resume from that
+point — the Coordinator reads persisted `DomainResult` rows rather than
+re-running agents. This makes each checkpoint a durable resume point.
+
+```typescript
+interface CheckpointRecord {
+  reviewId:      string;
+  stage:         "INPUT" | "CONTEXT" | "DOMAIN" | "OUTPUT" | "FINALIZE";
+  agentName?:    string;          // populated for DOMAIN stage
+  status:        "PASS" | "FAIL";
+  payload:       unknown;         // the validated output, or error details
+  createdAt:     string;
+}
+```
+
+---
+
+## Alarms
+
+Alarms are structured events emitted whenever a harness limit is breached or an
+integrity check fails. They are distinct from observability spans: spans record
+what happened; alarms signal that something went wrong and prescribe a response.
+
+Every alarm has a **named type**, **severity**, **context payload**, and a
+**recommendedAction** string the caller can surface to the user or log.
+
+### Alarm type
+
+```typescript
+type AlarmSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+interface Alarm {
+  alarmType:         AlarmType;
+  severity:          AlarmSeverity;
+  context:           Record<string, unknown>;
+  recommendedAction: string;
+  timestamp:         string;
+  reviewId?:         string;
+}
+```
+
+### Alarm catalogue
+
+| AlarmType | Severity | Trigger | Recommended action |
+|---|---|---|---|
+| `TURN_LIMIT_EXCEEDED` | HIGH | Agent hit `maxTurns` without a final answer | Retry with `--quick` mode; report partial results |
+| `TOKEN_BUDGET_EXCEEDED` | HIGH | Cumulative token spend crossed `maxTokens` | Retry with smaller PR or `--quick` mode |
+| `TIMEOUT` | HIGH | Wall-clock limit hit mid-run | Retry; check for slow tool (see `tool_errors`) |
+| `SCHEMA_VALIDATION_FAILED` | CRITICAL | Agent output doesn't parse against `PRReview` Zod schema | Discard run; surface raw model output for debugging |
+| `SECRET_DETECTED` | CRITICAL | Credential-shaped string found in review output | Discard run; do not write to disk; alert engineer |
+| `HALLUCINATED_FILE_CITATION` | HIGH | Finding references a file not in the PR diff | Strip finding; flag for quality review |
+| `REPEATED_TOOL_CALL` | MEDIUM | Same tool called with identical args 3× in a row | Abort loop; likely confused agent state |
+| `SCOPE_BUDGET_EXCEEDED` | MEDIUM | `external_context_calls` cap hit | Continue with gathered context; log for tuning |
+| `TOOL_TIMEOUT` | MEDIUM | A single tool call exceeded `TOOL_TIMEOUT_MS` | Return error-as-data; agent decides how to proceed |
+| `CHECKPOINT_FAILED` | HIGH | A named checkpoint stage returned FAIL | Stop run at that stage; surface checkpoint error |
+| `PR_TOO_LARGE` | LOW | PR exceeds size gate (files or lines) | Warn user; proceed only on explicit confirmation |
+
+### Alarm emission
+
+Alarms are emitted through a single `fireAlarm()` function so every consumer
+(OTel, SSE stream, CLI stderr) sees the same structured payload:
+
+```typescript
+function fireAlarm(alarm: Alarm): void {
+  // 1. Emit as OTel span event (always)
+  activeSpan?.addEvent("harness.alarm", alarm);
+  // 2. Push to SSE stream for web UI (if a reviewId is active)
+  sseEmitter.emit(alarm.reviewId, { type: "alarm", alarm });
+  // 3. Write to stderr in CLI mode
+  if (process.env.DELIVERY === "cli") {
+    console.error(JSON.stringify(alarm));
+  }
+}
+```
+
+---
+
 ## Tools
 
 All tool calls flow through `dispatch()` — the single guardrail choke point.
@@ -644,7 +750,7 @@ gauntlet-harness/
 | Observability | `@opentelemetry/sdk-node` | Backend-agnostic; swap exporter without touching instrumentation |
 | Git host | GitHub (`@octokit/rest`) | GitLab adapter planned; `GitClient` interface defined |
 | Ticket tracker | Linear (`@linear/sdk`) — MVP | Pluggable `TicketClient`; Jira, GitHub Issues adapters planned |
-| Tests | `vitest` | Fast, native ESM, TypeScript-first |
+| Tests | `jest` + `ts-jest` | TypeScript-first; consistent with other Andrew projects |
 
 ---
 
