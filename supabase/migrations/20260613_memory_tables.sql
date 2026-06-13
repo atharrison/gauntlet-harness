@@ -1,66 +1,67 @@
 -- Memory tables for gauntlet-harness
 -- Run against your existing Supabase project.
-
 -- Enable pgvector (required for v2 code search; harmless in v1)
-CREATE EXTENSION IF NOT EXISTS vector;
+create extension IF not exists vector;
 
 -- Memories: user-defined review criteria and team coding standards.
 -- These are injected into the system prompt at run start.
-CREATE TABLE IF NOT EXISTS memories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  content TEXT NOT NULL,
-  tags TEXT[] NOT NULL DEFAULT '{}',
-  context TEXT NOT NULL DEFAULT '',  -- empty = global; set to repo name to scope
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+create table if not exists memories (
+  id uuid primary key default gen_random_uuid(),
+  content text not null,
+  tags text[] not null default '{}',
+  context text not null default '', -- empty = global; set to repo name to scope
+  created_at timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS memories_context_idx ON memories (context);
+create index IF not exists memories_context_idx on memories (context);
 
 -- Review history: full output of every submitted PR review.
 -- Searched by the context agent via search_past_reviews().
-CREATE TABLE IF NOT EXISTS review_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pr_url TEXT NOT NULL,
-  repo_name TEXT NOT NULL,
-  pr_title TEXT NOT NULL,
-  author TEXT NOT NULL,
-  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  finding_count INTEGER NOT NULL DEFAULT 0,
-  summary TEXT NOT NULL DEFAULT '',
-  raw_json JSONB NOT NULL DEFAULT '{}'
+create table if not exists review_history (
+  id uuid primary key default gen_random_uuid(),
+  pr_url text not null,
+  repo_name text not null,
+  pr_title text not null,
+  author text not null,
+  reviewed_at timestamptz not null default now(),
+  finding_count integer not null default 0,
+  summary text not null default '',
+  raw_json jsonb not null default '{}'
 );
 
-CREATE INDEX IF NOT EXISTS review_history_repo_idx ON review_history (repo_name);
-CREATE INDEX IF NOT EXISTS review_history_author_idx ON review_history (author);
+create index IF not exists review_history_repo_idx on review_history (repo_name);
+
+create index IF not exists review_history_author_idx on review_history (author);
 
 -- Checkpoint records: pass/fail state for each review stage.
 -- Used by resumeFromCheckpoint() to skip already-completed stages.
 -- agent_name is nullable: single-agent stages (INPUT, OUTPUT, FINALIZE) leave it null;
 -- parallel domain agents (correctness, security) set it so they don't collide on DOMAIN.
-CREATE TABLE IF NOT EXISTS review_checkpoints (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  review_id TEXT NOT NULL,
-  stage TEXT NOT NULL,
-  agent_name TEXT,
-  passed BOOLEAN NOT NULL,
-  message TEXT,
-  payload JSONB,
-  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE NULLS NOT DISTINCT (review_id, stage, agent_name)
+create table if not exists review_checkpoints (
+  id uuid primary key default gen_random_uuid(),
+  review_id text not null,
+  stage text not null,
+  agent_name text,
+  passed boolean not null,
+  message text,
+  payload jsonb,
+  recorded_at timestamptz not null default now(),
+  unique NULLS not distinct (review_id, stage, agent_name)
 );
 
-CREATE INDEX IF NOT EXISTS review_checkpoints_review_idx ON review_checkpoints (review_id);
+create index IF not exists review_checkpoints_review_idx on review_checkpoints (review_id);
 
 -- Row-level security: service role key bypasses RLS.
 -- Anon key is read-only for memories; review_history is service-role-only.
-ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE review_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE review_checkpoints ENABLE ROW LEVEL SECURITY;
+alter table memories ENABLE row LEVEL SECURITY;
+
+alter table review_history ENABLE row LEVEL SECURITY;
+
+alter table review_checkpoints ENABLE row LEVEL SECURITY;
 
 -- Allow authenticated users to read memories
-CREATE POLICY "authenticated can read memories"
-  ON memories FOR SELECT
-  TO authenticated
-  USING (true);
+create policy "authenticated can read memories" on memories for
+select
+  to authenticated using (true);
 
 -- Service role writes everything (no policy needed — service role bypasses RLS)

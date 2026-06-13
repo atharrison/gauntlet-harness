@@ -12,14 +12,14 @@
 
 6 files changed. 6 read in full.
 
-| File | Status |
-|---|---|
-| `src/memory/store.ts` | ✅ Read |
-| `src/memory/local.ts` | ✅ Read |
-| `src/memory/supabase.ts` | ✅ Read |
-| `src/memory/index.ts` | ✅ Read |
+| File                                             | Status  |
+| ------------------------------------------------ | ------- |
+| `src/memory/store.ts`                            | ✅ Read |
+| `src/memory/local.ts`                            | ✅ Read |
+| `src/memory/supabase.ts`                         | ✅ Read |
+| `src/memory/index.ts`                            | ✅ Read |
 | `supabase/migrations/20260613_memory_tables.sql` | ✅ Read |
-| `tests/memory.test.ts` | ✅ Read |
+| `tests/memory.test.ts`                           | ✅ Read |
 
 ---
 

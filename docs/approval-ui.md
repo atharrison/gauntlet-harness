@@ -11,18 +11,18 @@ once for the CLI — using the same underlying `FindingDecision` schema.
 ```typescript
 // The decision the reviewer makes about each finding
 interface FindingDecision {
-  findingId: string;
-  included: boolean;
-  editedBody?: string;       // present only if reviewer changed it
-  editedSuggestion?: string; // present only if reviewer changed it
+  findingId: string
+  included: boolean
+  editedBody?: string // present only if reviewer changed it
+  editedSuggestion?: string // present only if reviewer changed it
 }
 
 // What gets submitted
 interface ReviewSubmission {
-  reviewId: string;
-  verdict: "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
-  summaryNote?: string;      // optional top-level comment from the reviewer
-  decisions: FindingDecision[];
+  reviewId: string
+  verdict: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
+  summaryNote?: string // optional top-level comment from the reviewer
+  decisions: FindingDecision[]
 }
 ```
 
@@ -50,6 +50,7 @@ to "opt in to what you want."
 ### Per-card
 
 Each finding card shows:
+
 - Severity badge · domain badge (Style / Correctness / Security / etc.)
 - `file:line` reference
 - Title (one-liner)
@@ -153,20 +154,20 @@ is finalized:
 
 ```typescript
 interface ReviewRecord {
-  prUrl: string;
-  prNumber: number;
-  ticket: string | null;
-  files: string[];
-  verdict: string;
-  findingsTotal: number;
-  findingsAccepted: number;
-  findingsEdited: number;
-  review: PRReview;          // full agent output (including rejected findings)
-  submission: ReviewSubmission; // what the reviewer actually sent
-  createdAt: string;
+  prUrl: string
+  prNumber: number
+  ticket: string | null
+  files: string[]
+  verdict: string
+  findingsTotal: number
+  findingsAccepted: number
+  findingsEdited: number
+  review: PRReview // full agent output (including rejected findings)
+  submission: ReviewSubmission // what the reviewer actually sent
+  createdAt: string
 }
 ```
 
 Storing both the full agent output and the reviewer's decisions means future
-reviews can learn what *this reviewer* tends to accept — not just what the
+reviews can learn what _this reviewer_ tends to accept — not just what the
 agent tends to generate.
