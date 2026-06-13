@@ -4,7 +4,6 @@ import type { ModelClient, ModelReply } from '../src/harness/models'
 import { InMemoryCheckpointStore } from '../src/harness/checkpoints'
 import type { ToolRegistry } from '../src/harness/tools'
 import { dispatch } from '../src/harness/tools'
-import { z } from 'zod'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

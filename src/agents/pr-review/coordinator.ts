@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { runCheckpoint } from '../../harness/checkpoints'
 import type { ReviewContext } from '../../harness/context'
 import { PRReviewSchema, type PRReview, type EnrichedContext } from './schema'
@@ -41,7 +40,7 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
     reviewId,
     stage: 'INPUT',
     store: deps.checkpoints,
-    check: async () => ({
+    check: () => Promise.resolve({
       pass: Boolean(prUrl),
       payload: { prUrl, mode },
       error: prUrl ? undefined : 'prUrl is required',
@@ -125,7 +124,7 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
     reviewId,
     stage: 'OUTPUT',
     store: deps.checkpoints,
-    check: async () => {
+    check: () => {
       const r = PRReviewSchema.safeParse({
         reviewId,
         prUrl,
@@ -143,11 +142,11 @@ export async function runReview(options: RunReviewOptions): Promise<PRReview> {
         confidence:
           (correctnessResult.confidence + securityResult.confidence) / 2,
       })
-      return {
+      return Promise.resolve({
         pass: r.success,
         payload: r.success ? r.data : ({} as PRReview),
         error: r.success ? undefined : r.error.message,
-      }
+      })
     },
   })
 

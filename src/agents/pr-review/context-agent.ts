@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { run } from '../../harness/loop'
 import { toToolDefinitions } from '../../harness/tools'
 import type { ReviewContext } from '../../harness/context'
@@ -38,8 +37,6 @@ Steps:
 3. Look for a Linear ticket ID in the branch name or PR title; if found use fetch_ticket
 4. Search past reviews with search_past_reviews for the most-changed files
 5. When done gathering, output your EnrichedContext JSON.`
-
-  const start = Date.now()
 
   const result = await run(userMessage, deps.model, tools, dispatch, {
     maxTurns: 15,
