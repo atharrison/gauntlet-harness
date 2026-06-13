@@ -83,7 +83,60 @@ export async function POST(
     )
   }
 
-  // ── Build FindingDecision map from the submitted decisions ────────────────
+  // ── Two fully separate paths — approve (clean review) vs. submit (findings) ──
+
+  const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+  const memory = createMemoryStore()
+
+  if (approve) {
+    // ── Approve path: no findings, post LGTM comment ────────────────────────
+    const approvalSubmission = buildSubmission(
+      { reviewId, decisions: {}, submitting: false, submitted: true, result: null },
+      postComment
+    )
+    await memory
+      .storeReview({ review, submission: approvalSubmission }, {
+        prUrl,
+        repoName: prUrlParts ? `${prUrlParts[1]}/${prUrlParts[2]}` : 'unknown/unknown',
+        prTitle: review.summary.slice(0, 80),
+        author: 'unknown',
+        prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
+      })
+      .catch(err => console.error('[finalize] storeReview failed:', err))
+
+    let commentResult: unknown = null
+    if (postComment) {
+      const octokit = createOctokit()
+      if (!octokit) {
+        commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
+      } else if (!prUrlParts) {
+        commentResult = { skipped: true, reason: 'Could not parse prUrl for GitHub API' }
+      } else {
+        const commentBody = formatApprovalComment(review)
+        const dryRun = process.env.DRY_RUN === 'true'
+        if (dryRun) {
+          commentResult = { dryRun: true, body: commentBody }
+        } else {
+          try {
+            const { data } = await octokit.issues.createComment({
+              owner: prUrlParts[1],
+              repo: prUrlParts[2],
+              issue_number: Number(prUrlParts[3]),
+              body: commentBody,
+            })
+            commentResult = { id: data.id, url: data.html_url }
+          } catch (err) {
+            commentResult = { error: String(err) }
+          }
+        }
+      }
+    }
+
+    invalidateCachedReview(reviewId)
+    return NextResponse.json({ reviewId, status: 'approved', comment: commentResult })
+  }
+
+  // ── Submit path: build decision map, persist, post findings comment ────────
   const decisionMap: Record<string, FindingDecision> = {}
   for (const d of rawDecisions) {
     decisionMap[d.findingId] = {
@@ -95,56 +148,32 @@ export async function POST(
   }
 
   const submission = buildSubmission(
-    {
-      reviewId,
-      decisions: decisionMap,
-      submitting: false,
-      submitted: true,
-      result: null,
-    },
+    { reviewId, decisions: decisionMap, submitting: false, submitted: true, result: null },
     postComment
   )
 
-  // ── Persist to memory store ───────────────────────────────────────────────
-  const memory = createMemoryStore()
   const accepted = rawDecisions.filter(d => d.action !== 'REJECT').length
   const rejected = rawDecisions.filter(d => d.action === 'REJECT').length
 
-  const prUrlParts = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
-
   await memory
-    .storeReview(
-      { review, submission },
-      {
-        prUrl,
-        repoName: prUrlParts
-          ? `${prUrlParts[1]}/${prUrlParts[2]}`
-          : 'unknown/unknown',
-        prTitle: review.summary.slice(0, 80),
-        author: 'unknown',
-        prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
-      }
-    )
-    .catch(err => {
-      // Non-fatal — log but don't fail the request
-      console.error('[finalize] storeReview failed:', err)
+    .storeReview({ review, submission }, {
+      prUrl,
+      repoName: prUrlParts ? `${prUrlParts[1]}/${prUrlParts[2]}` : 'unknown/unknown',
+      prTitle: review.summary.slice(0, 80),
+      author: 'unknown',
+      prNumber: prUrlParts ? Number(prUrlParts[3]) : 0,
     })
+    .catch(err => console.error('[finalize] storeReview failed:', err))
 
-  // ── Optionally post GitHub comment ────────────────────────────────────────
   let commentResult: unknown = null
   if (postComment) {
     const octokit = createOctokit()
     if (!octokit) {
       commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
     } else if (!prUrlParts) {
-      commentResult = {
-        skipped: true,
-        reason: 'Could not parse prUrl for GitHub API',
-      }
+      commentResult = { skipped: true, reason: 'Could not parse prUrl for GitHub API' }
     } else {
-      const commentBody = approve
-        ? formatApprovalComment(review)
-        : formatGitHubComment(review, submission)
+      const commentBody = formatGitHubComment(review, submission)
       const dryRun = process.env.DRY_RUN === 'true'
       if (dryRun) {
         commentResult = { dryRun: true, body: commentBody }
@@ -164,17 +193,11 @@ export async function POST(
     }
   }
 
-  // Invalidate cache so the review cannot be double-submitted
   invalidateCachedReview(reviewId)
-
   return NextResponse.json({
     reviewId,
     status: 'finalized',
-    summary: {
-      totalDecisions: rawDecisions.length,
-      accepted,
-      rejected,
-    },
+    summary: { totalDecisions: rawDecisions.length, accepted, rejected },
     comment: commentResult,
   })
 }
