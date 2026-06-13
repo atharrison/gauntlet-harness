@@ -277,6 +277,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   async function handleSubmit(postComment: boolean) {
     setSubmitting(true)
+    setSubmitResult(null) // clear any previous error before retry
     try {
       const body = {
         decisions: Object.values(decisions).map(d => ({
@@ -312,6 +313,7 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   async function handleApprove(postComment: boolean) {
     setSubmitting(true)
+    setSubmitResult(null) // clear any previous error before retry
     try {
       const res = await fetch(`/api/review/${reviewId}/finalize`, {
         method: 'POST',
@@ -573,14 +575,14 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   {formatElapsed(runStats.durationMs)}
                 </p>
                 <div className="mt-1.5 space-y-0.5">
-                  {Object.entries(runStats.phaseDurations).map(([phase, ms]) => (
+                  {Object.entries(runStats.phaseDurations ?? {}).map(([phase, ms]) => (
                     <div key={phase} className="flex items-center gap-2">
                       <span className="text-xs text-gray-600 w-16">{phase}</span>
                       <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-indigo-600 rounded-full"
                           style={{
-                            width: `${Math.min(100, (ms / runStats.durationMs) * 100)}%`,
+                            width: `${runStats.durationMs > 0 ? Math.min(100, (ms / runStats.durationMs) * 100) : 0}%`,
                           }}
                         />
                       </div>
