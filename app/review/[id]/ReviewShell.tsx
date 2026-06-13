@@ -17,7 +17,8 @@ interface Finding {
 interface FindingDecision {
   findingId: string
   accepted: boolean
-  editedText?: string
+  editedTitle?: string
+  editedBody?: string
 }
 
 type StreamStatus = 'connecting' | 'running' | 'done' | 'error'
@@ -81,7 +82,8 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
     {}
   )
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
+  const [editTitle, setEditTitle] = useState('')
+  const [editBody, setEditBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitResult, setSubmitResult] = useState<string | null>(null)
   const [phaseStatuses, setPhaseStatuses] = useState<
@@ -228,13 +230,22 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
 
   function startEdit(finding: Finding) {
     setEditingId(finding.id)
-    setEditText(decisions[finding.id]?.editedText ?? finding.suggestedFix ?? '')
+    const d = decisions[finding.id]
+    setEditTitle(d?.editedTitle ?? finding.title)
+    setEditBody(d?.editedBody ?? finding.body)
   }
 
   function saveEdit(id: string) {
+    const finding = findings.find(f => f.id === id)
     setDecisions(prev => ({
       ...prev,
-      [id]: { ...prev[id], editedText: editText || undefined },
+      [id]: {
+        ...prev[id],
+        editedTitle:
+          editTitle !== finding?.title ? editTitle || undefined : undefined,
+        editedBody:
+          editBody !== finding?.body ? editBody || undefined : undefined,
+      },
     }))
     setEditingId(null)
   }
@@ -245,8 +256,13 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
       const body = {
         decisions: Object.values(decisions).map(d => ({
           findingId: d.findingId,
-          action: d.accepted ? (d.editedText ? 'EDIT' : 'ACCEPT') : 'REJECT',
-          editedBody: d.editedText,
+          action: d.accepted
+            ? d.editedTitle || d.editedBody
+              ? 'EDIT'
+              : 'ACCEPT'
+            : 'REJECT',
+          editedTitle: d.editedTitle,
+          editedBody: d.editedBody,
         })),
         postComment,
       }
@@ -357,19 +373,43 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                 </div>
 
                 <p className="mt-2 text-sm font-medium text-gray-100">
-                  {f.title}
+                  {decisions[f.id]?.editedTitle ? (
+                    <span className="text-indigo-300">
+                      {decisions[f.id].editedTitle}
+                    </span>
+                  ) : (
+                    f.title
+                  )}
                 </p>
-                <p className="mt-1 text-sm text-gray-400">{f.body}</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {decisions[f.id]?.editedBody ?? f.body}
+                </p>
 
                 {isEditing ? (
-                  <div className="mt-3">
-                    <textarea
-                      className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                      rows={3}
-                      value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                    />
-                    <div className="mt-2 flex gap-2">
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        Description
+                      </label>
+                      <textarea
+                        className="w-full rounded border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                        rows={4}
+                        value={editBody}
+                        onChange={e => setEditBody(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
                       <button
                         onClick={() => saveEdit(f.id)}
                         className="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-500"
@@ -386,16 +426,16 @@ export function ReviewShell({ reviewId, prUrl }: Props) {
                   </div>
                 ) : (
                   <>
-                    {(decision?.editedText ?? f.suggestedFix) && (
+                    {f.suggestedFix && (
                       <p className="mt-2 rounded bg-gray-800 px-3 py-2 font-mono text-xs text-green-400">
-                        {decision?.editedText ?? f.suggestedFix}
+                        {f.suggestedFix}
                       </p>
                     )}
                     <button
                       onClick={() => startEdit(f)}
                       className="mt-2 text-xs text-indigo-400 hover:underline"
                     >
-                      {decision?.editedText ? 'Edit fix' : 'Add fix'}
+                      Edit suggestion
                     </button>
                   </>
                 )}

@@ -17,6 +17,7 @@ import type { FindingDecision } from '../../../../../src/agents/pr-review/schema
 const FindingDecisionInput = z.object({
   findingId: z.string(),
   action: z.enum(['ACCEPT', 'REJECT', 'EDIT']),
+  editedTitle: z.string().optional(),
   editedBody: z.string().optional(),
 })
 
@@ -66,6 +67,7 @@ export async function POST(
     decisionMap[d.findingId] = {
       findingId: d.findingId,
       action: d.action,
+      editedTitle: d.editedTitle,
       editedBody: d.editedBody,
     }
   }
