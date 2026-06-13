@@ -31,8 +31,6 @@ const PostReviewCommentSchema = z.object({
 
 const FILE_CONTENT_MAX_BYTES = 8 * 1024 // 8 KB per file — guardrail
 
-const DRY_RUN = process.env.DRY_RUN === 'true'
-
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
 export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
@@ -48,6 +46,8 @@ export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
           pull_number,
           mediaType: { format: 'diff' },
         })
+        // Octokit returns the raw diff as a string for the 'diff' media type,
+        // but the TS types don't model custom media overrides — cast is intentional.
         return { diff: data as unknown as string }
       },
     },
@@ -61,7 +61,7 @@ export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
           owner,
           repo,
           pull_number,
-          per_page: 100,
+          per_page: 100, // MVP: no pagination; sufficient for demo target
         })
         return data.map(c => ({
           id: c.id,
@@ -83,7 +83,7 @@ export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
           owner,
           repo,
           pull_number,
-          per_page: 100,
+          per_page: 100, // MVP: no pagination; GitHub caps at 300 files total
         })
         return data.map(f => ({
           filename: f.filename,
@@ -101,7 +101,7 @@ export function createGithubTools(octokit: Octokit): Record<string, ToolEntry> {
         'Post a review comment to a pull request. Gated by DRY_RUN env var — set DRY_RUN=true to suppress actual posting.',
       schema: PostReviewCommentSchema,
       fn: async ({ owner, repo, pull_number, body }) => {
-        if (DRY_RUN) {
+        if (process.env.DRY_RUN === 'true') {
           return {
             dryRun: true,
             message: 'DRY_RUN=true — comment not posted',

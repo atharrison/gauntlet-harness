@@ -36,14 +36,6 @@ export interface ReviewContext {
 }
 
 // ── buildRegistry — assemble all tools given a dep set ────────────────────────
-//
-// FIR-4 will fill this in with:
-//   ...createGithubTools(octokit),
-//   ...createMemoryTools(deps.memory),
-//   ...createTicketTools(linearClient),
-//
-// For now it returns an empty registry so the rest of the composition plumbing
-// can be exercised end-to-end before tools exist.
 
 export function buildRegistry(deps: ReviewDeps): ToolRegistry {
   // GitHub tools are lazy-loaded so the Octokit ESM package doesn't break

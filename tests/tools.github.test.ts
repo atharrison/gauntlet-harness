@@ -64,17 +64,32 @@ describe('createGithubTools', () => {
   })
 
   describe('post_review_comment', () => {
-    it('returns dry-run response when DRY_RUN=true', async () => {
-      const original = process.env.DRY_RUN
-      // DRY_RUN is read at module load time, so we test via the factory
-      // by checking the guard logic directly
+    const original = process.env.DRY_RUN
+
+    afterEach(() => {
+      process.env.DRY_RUN = original
+    })
+
+    it('returns dry-run response and skips API when DRY_RUN=true', async () => {
+      process.env.DRY_RUN = 'true'
+      const octokit = mockOctokit()
+      const tools = createGithubTools(octokit)
+      const result = await tools.post_review_comment.fn({
+        owner: 'org',
+        repo: 'repo',
+        pull_number: 1,
+        body: 'test comment',
+      })
+      expect((result as { dryRun: boolean }).dryRun).toBe(true)
+      expect(octokit.issues.createComment).not.toHaveBeenCalled()
+    })
+
+    it('calls the API when DRY_RUN is not set', async () => {
+      delete process.env.DRY_RUN
       const octokit = mockOctokit()
       ;(octokit.issues.createComment as jest.Mock).mockResolvedValue({
         data: { id: 1, html_url: 'https://github.com' },
       })
-
-      // Without DRY_RUN, it should call the API
-      process.env.DRY_RUN = 'false'
       const tools = createGithubTools(octokit)
       await tools.post_review_comment.fn({
         owner: 'org',
@@ -83,7 +98,6 @@ describe('createGithubTools', () => {
         body: 'test comment',
       })
       expect(octokit.issues.createComment).toHaveBeenCalledTimes(1)
-      process.env.DRY_RUN = original
     })
   })
 
