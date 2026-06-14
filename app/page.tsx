@@ -7,6 +7,7 @@ export default function HomePage() {
   const router = useRouter()
   const [prUrl, setPrUrl] = useState('')
   const [quickMode, setQuickMode] = useState(false)
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +20,7 @@ export default function HomePage() {
       const res = await fetch('/api/review/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prUrl, mode: quickMode ? 'quick' : 'full' }),
+        body: JSON.stringify({ prUrl, mode: quickMode ? 'quick' : 'full', password }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -57,6 +58,40 @@ export default function HomePage() {
           required
           className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
+
+        {/* Access code row */}
+        <div className="flex items-center gap-2">
+          {/* Lock icon + tooltip */}
+          <div className="group relative flex-shrink-0">
+            <span className="cursor-default select-none text-base leading-none text-gray-500 hover:text-gray-300 transition-colors">
+              🔒
+            </span>
+            <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-gray-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 z-10">
+              <p className="font-semibold text-white mb-1">Access required</p>
+              <p className="text-gray-400">
+                The Fired Festival hackathon is complete and API access is limited.
+                To try it out, reach out via{' '}
+                <a
+                  href="https://github.com/atharrison"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-400 underline hover:text-indigo-300"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  GitHub (@atharrison)
+                </a>{' '}
+                and I&apos;ll send you an access code.
+              </p>
+            </div>
+          </div>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Access code"
+            className="flex-1 rounded-lg border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
 
         {/* Quick mode toggle */}
         <label className="flex cursor-pointer items-center gap-3 self-start rounded-lg border border-gray-800 bg-gray-900 px-4 py-2.5 hover:border-gray-700 transition-colors">

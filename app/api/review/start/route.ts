@@ -5,12 +5,19 @@ import { z } from 'zod'
 const StartReviewBody = z.object({
   prUrl: z.string().url('prUrl must be a valid GitHub PR URL'),
   mode: z.enum(['full', 'quick']).default('full'),
+  password: z.string().optional(),
 })
+
+function checkPassword(submitted: string | undefined): boolean {
+  const raw = process.env.ACCESS_PASSWORDS
+  if (!raw || raw.trim() === '') return true // gate is open (local dev / no env var set)
+  const valid = raw.split(',').map(p => p.trim()).filter(Boolean)
+  return valid.length === 0 || valid.includes(submitted ?? '')
+}
 
 /**
  * POST /api/review/start
  * Validates the PR URL, mints a reviewId, and returns it.
- * Agents are wired in FIR-8 — this is the stub.
  */
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -25,6 +32,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten() },
       { status: 422 }
+    )
+  }
+
+  if (!checkPassword(parsed.data.password)) {
+    return NextResponse.json(
+      { error: 'Invalid access code. Reach out via GitHub (@atharrison) to get one.' },
+      { status: 401 }
     )
   }
 
