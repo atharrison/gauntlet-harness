@@ -82,6 +82,10 @@ export default function HomePage() {
                 </a>{' '}
                 and I&apos;ll send you an access code.
               </p>
+              <p className="mt-1.5 text-gray-500 italic">
+                Attended Fired Festival? You might already have the code.
+              </p>
+              </p>
             </div>
           </div>
           <input
