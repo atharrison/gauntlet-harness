@@ -70,7 +70,7 @@ export default function HomePage() {
               <p className="font-semibold text-white mb-1">Access required</p>
               <p className="text-gray-400">
                 The Fired Festival hackathon is complete and API access is limited.
-                To try it out, reach out via{' '}
+                To request access, find me on{' '}
                 <a
                   href="https://github.com/atharrison"
                   target="_blank"
