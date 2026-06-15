@@ -11,7 +11,10 @@ const StartReviewBody = z.object({
 function checkPassword(submitted: string | undefined): boolean {
   const raw = process.env.ACCESS_PASSWORDS
   if (!raw || raw.trim() === '') return true // gate is open (local dev / no env var set)
-  const valid = raw.split(',').map(p => p.trim()).filter(Boolean)
+  const valid = raw
+    .split(',')
+    .map(p => p.trim())
+    .filter(Boolean)
   return valid.length === 0 || valid.includes(submitted ?? '')
 }
 
@@ -37,7 +40,10 @@ export async function POST(request: NextRequest) {
 
   if (!checkPassword(parsed.data.password)) {
     return NextResponse.json(
-      { error: 'Invalid access code. Reach out via GitHub (@atharrison) to get one.' },
+      {
+        error:
+          'Invalid access code. Reach out via GitHub (@atharrison) to get one.',
+      },
       { status: 401 }
     )
   }

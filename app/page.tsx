@@ -20,7 +20,11 @@ export default function HomePage() {
       const res = await fetch('/api/review/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prUrl, mode: quickMode ? 'quick' : 'full', password }),
+        body: JSON.stringify({
+          prUrl,
+          mode: quickMode ? 'quick' : 'full',
+          password,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -69,8 +73,8 @@ export default function HomePage() {
             <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-gray-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 z-10">
               <p className="font-semibold text-white mb-1">Access required</p>
               <p className="text-gray-400">
-                The Fired Festival hackathon is complete and API access is limited.
-                To request access, find me on{' '}
+                The Fired Festival hackathon is complete and API access is
+                limited. To request access, find me on{' '}
                 <a
                   href="https://github.com/atharrison"
                   target="_blank"
@@ -83,7 +87,7 @@ export default function HomePage() {
                 and I&apos;ll send you an access code.
               </p>
               <p className="mt-1.5 text-gray-500 italic">
-                Attended Fired Festival? You might already have the code.
+                Attended as a Challenger? You might already have the code.
               </p>
             </div>
           </div>

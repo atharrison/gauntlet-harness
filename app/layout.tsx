@@ -26,6 +26,20 @@ export default function RootLayout({
             <span className="rounded bg-indigo-900 px-2 py-0.5 text-xs font-medium text-indigo-300">
               BETA
             </span>
+            <nav className="ml-4 flex items-center gap-5">
+              <Link
+                href="/architecture"
+                className="text-sm text-gray-400 transition-colors hover:text-gray-200"
+              >
+                Architecture
+              </Link>
+              <Link
+                href="/blog"
+                className="text-sm text-gray-400 transition-colors hover:text-gray-200"
+              >
+                Blog
+              </Link>
+            </nav>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
