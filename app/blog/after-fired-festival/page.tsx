@@ -46,6 +46,26 @@ export default function BlogPage() {
           After Fired Festival
         </h1>
         <p className="text-sm text-gray-500">Sunday, June 14, 2026</p>
+        <p className="mt-2 text-sm text-gray-500">
+          by{' '}
+          <a
+            href="https://www.linkedin.com/in/andrew-harrison-0287952/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 transition-colors hover:text-gray-200"
+          >
+            Andrew Harrison
+          </a>
+          <span className="mx-2 text-gray-700">·</span>
+          <a
+            href="https://github.com/atharrison"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 transition-colors hover:text-gray-200"
+          >
+            @atharrison
+          </a>
+        </p>
       </header>
 
       <hr className="mb-10 border-gray-800" />
