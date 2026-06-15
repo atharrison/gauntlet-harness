@@ -13,9 +13,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'After Fired Festival',
-    description: 'A first-place finish at the Fired Festival AI hackathon, and what it meant.',
-    images: ['/fired-festival-badge.png'],
     description: 'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
+    images: ['/fired-festival-badge.png'],
   },
 }
 
