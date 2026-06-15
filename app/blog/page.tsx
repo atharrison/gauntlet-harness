@@ -77,6 +77,12 @@ export default function BlogPage() {
           build something that, regardless of the outcome, would solve a
           pain-point I currently have: reviewing code.
         </p>
+        <blockquote className="border-l-2 border-indigo-500 pl-5 my-6">
+          <p className="text-lg italic text-indigo-300 leading-relaxed">
+            &ldquo;I&apos;d build something that, regardless of the outcome, would
+            solve a pain-point I currently have: reviewing code.&rdquo;
+          </p>
+        </blockquote>
         <p>
           I saw the writing on the wall 9 months ago, when I really started
           using Cursor and AI-assisted development. The amount of code I was
@@ -110,6 +116,12 @@ export default function BlogPage() {
           dog-fooding moment, and the flywheel I had built was proving itself in
           realtime.
         </p>
+        <blockquote className="border-l-2 border-indigo-500 pl-5 my-6">
+          <p className="text-lg italic text-indigo-300 leading-relaxed">
+            &ldquo;It was the ultimate dog-fooding moment, and the flywheel I had
+            built was proving itself in realtime.&rdquo;
+          </p>
+        </blockquote>
         <p>
           Lunch consisted of a quick salad/sandwich in one hand, while balancing
           a laptop in the other, screen open, prodding the AI along as I ate. By
@@ -158,6 +170,12 @@ export default function BlogPage() {
           The new abstraction is that we can now essentially write software in
           English, and do it at near the speed of thought.
         </p>
+        <blockquote className="border-l-2 border-indigo-500 pl-5 my-6">
+          <p className="text-lg italic text-indigo-300 leading-relaxed">
+            &ldquo;The new abstraction is that we can now essentially write
+            software in English, and do it at near the speed of thought.&rdquo;
+          </p>
+        </blockquote>
         <p>
           What stays constant are the fundamentals. Thoughtful design, clear
           requirements, and well thought out architecture are going to be even
