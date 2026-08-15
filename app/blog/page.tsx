@@ -8,7 +8,9 @@ export const metadata: Metadata = {
 export default function BlogIndexPage() {
   return (
     <div className="mx-auto max-w-2xl py-12">
-      <h1 className="mb-10 text-3xl font-bold tracking-tight text-white">Blog</h1>
+      <h1 className="mb-10 text-3xl font-bold tracking-tight text-white">
+        Blog
+      </h1>
       <Link
         href="/blog/after-fired-festival"
         className="group block rounded-xl border border-gray-800 bg-gray-900 p-6 transition hover:border-gray-700"
@@ -20,7 +22,8 @@ export default function BlogIndexPage() {
           After Fired Festival
         </h2>
         <p className="text-sm text-gray-400">
-          A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.
+          A first-place finish at the 2026 Fired Festival AI hackathon, and what
+          it meant.
         </p>
       </Link>
     </div>

@@ -7,13 +7,15 @@ export const metadata: Metadata = {
     'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
   openGraph: {
     title: 'After Fired Festival',
-    description: 'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
+    description:
+      'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
     images: [{ url: '/fired-festival-badge.png', width: 771, height: 1028 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'After Fired Festival',
-    description: 'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
+    description:
+      'A first-place finish at the 2026 Fired Festival AI hackathon, and what it meant.',
     images: ['/fired-festival-badge.png'],
   },
 }
@@ -75,8 +77,14 @@ export default function BlogPage() {
         <div className="space-y-6 text-xl text-gray-200 leading-relaxed">
           <p>1 year ago I&apos;d never heard of Cursor.</p>
           <p>2 weeks ago, I signed up for an AI hackathon.</p>
-          <p>3 days ago, I nearly gave up my spot, with imposter syndrome creeping in.</p>
-          <p>Today I&apos;m back home, staring a bit in disbelief at the Mac Mini sitting on my desk, a first place prize for my time and efforts.</p>
+          <p>
+            3 days ago, I nearly gave up my spot, with imposter syndrome
+            creeping in.
+          </p>
+          <p>
+            Today I&apos;m back home, staring a bit in disbelief at the Mac Mini
+            sitting on my desk, a first place prize for my time and efforts.
+          </p>
         </div>
         <div className="overflow-hidden rounded-xl">
           <img
@@ -112,8 +120,8 @@ export default function BlogPage() {
         </p>
         <blockquote className="border-l-2 border-indigo-500 pl-5 my-6">
           <p className="text-lg italic text-indigo-300 leading-relaxed">
-            &ldquo;I&apos;d build something that, regardless of the outcome, would
-            solve a pain-point I currently have: reviewing code.&rdquo;
+            &ldquo;I&apos;d build something that, regardless of the outcome,
+            would solve a pain-point I currently have: reviewing code.&rdquo;
           </p>
         </blockquote>
         <p>
@@ -151,8 +159,8 @@ export default function BlogPage() {
         </p>
         <blockquote className="border-l-2 border-indigo-500 pl-5 my-6">
           <p className="text-lg italic text-indigo-300 leading-relaxed">
-            &ldquo;It was the ultimate dog-fooding moment, and the flywheel I had
-            built was proving itself in realtime.&rdquo;
+            &ldquo;It was the ultimate dog-fooding moment, and the flywheel I
+            had built was proving itself in realtime.&rdquo;
           </p>
         </blockquote>
         <p>
