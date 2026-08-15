@@ -18,5 +18,7 @@ coverage/
 
 PR_DESCRIPTION.md
 
-# Supabase local state (Docker volumes, keys — not for commit)
+# Supabase local state (Docker volumes, keys, CLI temp — not for commit)
 .supabase/
+supabase/.branches/
+supabase/.temp/
