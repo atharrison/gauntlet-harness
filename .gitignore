@@ -17,3 +17,6 @@ NOTES.md
 coverage/
 
 PR_DESCRIPTION.md
+
+# Supabase local state (Docker volumes, keys — not for commit)
+.supabase/

@@ -1,5 +1,7 @@
 > **Starting a new session?** Run `/current-state` to orient before starting work.
 
+> **Linear note:** The hackathon team key was renamed from `FIR` → `ATH` (team renamed "Fired Festival" → "Team Andrew"). All old hackathon tickets (FIR-1 through FIR-11) are now `ATH-1` through `ATH-11`. New v1 MVP tickets also use the `ATH-` prefix. The project is **Review Harness V1 MVP**.
+
 ---
 
 # Session State — 2026-06-13 16:24

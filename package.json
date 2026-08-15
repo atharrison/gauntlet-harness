@@ -16,7 +16,13 @@
     "format": "prettier --write \"**/*.{ts,js,tsx,jsx,json,md,sql}\"",
     "format:check": "prettier --check \"**/*.{ts,js,tsx,jsx,json,md,sql}\"",
     "review": "ts-node --esm src/cli/index.ts",
-    "pdf": "./scripts/generate-pdf.sh"
+    "pdf": "./scripts/generate-pdf.sh",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:migrate": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:studio": "supabase studio",
+    "db:types": "supabase gen types typescript --local > src/types/database.types.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
@@ -57,6 +63,7 @@
     "pg": "^8.21.0",
     "prettier": "^3.8.4",
     "prettier-plugin-sql": "^0.20.0",
+    "supabase": "^2.114.0",
     "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
