@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
-  getCachedReview,
-  invalidateCachedReview,
-} from '../../../../../src/harness/review-cache'
+  getReview,
+  setReviewSubmission,
+} from '../../../../../src/memory/review-store'
 import { createMemoryStore } from '../../../../../src/memory/index'
 import {
   formatGitHubComment,
@@ -53,15 +53,22 @@ export async function POST(
 
   const { decisions: rawDecisions, postComment, approve } = parsed.data
 
-  // ── Load PRReview from in-process cache ───────────────────────────────────
-  const cached = getCachedReview(reviewId)
-  if (!cached) {
+  // ── Load PRReview from Supabase ───────────────────────────────────────────
+  let reviewRow
+  try {
+    reviewRow = await getReview(reviewId)
+  } catch (err) {
+    console.error(`[finalize/${reviewId}] getReview failed:`, err)
+    return NextResponse.json({ error: 'Failed to load review.' }, { status: 500 })
+  }
+  if (!reviewRow || reviewRow.status !== 'COMPLETE' || !reviewRow.result) {
     return NextResponse.json(
-      { error: 'Review not found or expired. Reviews are cached for 1 hour.' },
+      { error: 'Review not found or not yet complete.' },
       { status: 404 }
     )
   }
-  const { review, prUrl } = cached
+  const review = reviewRow.result
+  const prUrl = reviewRow.pr_url
 
   // ── Mutual-exclusivity guards ─────────────────────────────────────────────
   // totalFindings includes all severities (blocking + suggestions + nits),
@@ -167,7 +174,9 @@ export async function POST(
       }
     }
 
-    invalidateCachedReview(reviewId)
+    await setReviewSubmission(reviewId, approvalSubmission).catch(err =>
+      console.error('[finalize] setReviewSubmission failed:', err)
+    )
     return NextResponse.json({
       reviewId,
       status: 'approved',
@@ -252,7 +261,9 @@ export async function POST(
     }
   }
 
-  invalidateCachedReview(reviewId)
+  await setReviewSubmission(reviewId, submission).catch(err =>
+    console.error('[finalize] setReviewSubmission failed:', err)
+  )
   return NextResponse.json({
     reviewId,
     status: 'finalized',
