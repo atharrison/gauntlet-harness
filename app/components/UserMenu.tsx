@@ -1,6 +1,5 @@
 'use client'
 
-import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
@@ -10,16 +9,13 @@ export default function UserMenu({ user }: { user: User }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-  )
-
   const avatarUrl: string | undefined = user.user_metadata?.avatar_url
   const username: string = user.user_metadata?.user_name ?? user.email ?? 'User'
 
   async function handleSignOut() {
-    await supabase.auth.signOut()
+    // POST to server route so it can clear the httpOnly gh_provider_token cookie
+    // in addition to the Supabase session — client-side JS can't delete httpOnly cookies.
+    await fetch('/api/auth/signout', { method: 'POST' })
     router.push('/login')
     router.refresh()
   }

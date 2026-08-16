@@ -41,9 +41,24 @@ export async function GET(request: NextRequest) {
       }
     )
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data: exchangeData, error } =
+      await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       return NextResponse.redirect(new URL('/login?error=auth_failed', origin))
+    }
+
+    // Supabase drops provider_token from the session on every token refresh
+    // (the refresh endpoint doesn't return it). Store it in a separate httpOnly
+    // cookie so getGitHubToken() can read it on subsequent requests.
+    const providerToken = exchangeData.session?.provider_token
+    if (providerToken) {
+      cookieStore.set('gh_provider_token', providerToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 8, // 8 hours — matches typical GitHub OAuth token lifetime
+        path: '/',
+      })
     }
 
     // Allowlist check — Phase 1 stopgap until ATH-26 ships a proper invite system.

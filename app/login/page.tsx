@@ -11,7 +11,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 function LoginForm() {
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/'
+  // Validate next is a relative path — the callback also validates, but we
+  // sanitize here too so we don't forward an arbitrary URL in the redirectTo.
+  const rawNext = searchParams.get('next') ?? '/'
+  const next =
+    rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
   const errorKey = searchParams.get('error')
   const errorMessage = errorKey
     ? (ERROR_MESSAGES[errorKey] ?? 'An error occurred. Please try again.')
