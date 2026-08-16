@@ -1,17 +1,24 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import './globals.css'
+import { createSupabaseServerClient } from '../src/lib/supabase/server'
+import UserMenu from './components/UserMenu'
 
 export const metadata: Metadata = {
   title: 'PR Review Harness',
   description: 'AI-assisted PR review with multi-agent orchestration',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
@@ -40,6 +47,7 @@ export default function RootLayout({
                 Blog
               </Link>
             </nav>
+            {user && <UserMenu user={user} />}
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
