@@ -19,5 +19,7 @@ export async function POST(_request: NextRequest) {
   const cookieStore = await cookies()
   cookieStore.delete(GH_TOKEN_COOKIE)
 
-  return NextResponse.redirect(new URL('/login', _request.url))
+  // 303 See Other ensures the browser issues a GET to /login rather than
+  // re-POSTing (which is the default browser behavior for 307/308 on POST).
+  return NextResponse.redirect(new URL('/login', _request.url), { status: 303 })
 }

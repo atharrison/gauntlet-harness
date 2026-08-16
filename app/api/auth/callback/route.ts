@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { type NextRequest, NextResponse } from 'next/server'
+import { GH_TOKEN_COOKIE } from '../../../../src/lib/supabase/server'
 
 /**
  * GET /api/auth/callback
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     // cookie so getGitHubToken() can read it on subsequent requests.
     const providerToken = exchangeData.session?.provider_token
     if (providerToken) {
-      cookieStore.set('gh_provider_token', providerToken, {
+      cookieStore.set(GH_TOKEN_COOKIE, providerToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -72,9 +73,8 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
 
     if (allowed.length > 0) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      // Use the user from the exchange result directly — no extra network call needed.
+      const user = exchangeData.session?.user
       // Supabase stores the GitHub login in user_metadata.user_name for most
       // providers; fall back to identities array in case the shape differs.
       const githubLogin: string | undefined = (
@@ -82,21 +82,16 @@ export async function GET(request: NextRequest) {
         user?.identities?.[0]?.identity_data?.user_name
       )?.toLowerCase()
 
-      if (!githubLogin) {
-        // Best-effort sign-out — if it fails, middleware will still block the
-        // user on the next request since the session won't pass getUser().
+      // Helper: sign out and clear the provider token cookie before denying access.
+      // Best-effort sign-out — if it fails, middleware blocks on the next request.
+      const denyAndRedirect = async (error: string) => {
         await supabase.auth.signOut().catch(() => null)
-        return NextResponse.redirect(
-          new URL('/login?error=no_github_login', origin)
-        )
+        cookieStore.delete(GH_TOKEN_COOKIE)
+        return NextResponse.redirect(new URL(`/login?error=${error}`, origin))
       }
 
-      if (!allowed.includes(githubLogin)) {
-        await supabase.auth.signOut().catch(() => null)
-        return NextResponse.redirect(
-          new URL('/login?error=unauthorized', origin)
-        )
-      }
+      if (!githubLogin) return denyAndRedirect('no_github_login')
+      if (!allowed.includes(githubLogin)) return denyAndRedirect('unauthorized')
     }
 
     return NextResponse.redirect(new URL(next, origin))
