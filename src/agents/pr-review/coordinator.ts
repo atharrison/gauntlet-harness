@@ -33,7 +33,7 @@ export interface RunReviewOptions {
  * can stream them to the browser.
  */
 export async function runReview(options: RunReviewOptions): Promise<PRReview> {
-  const { reviewId, prUrl, mode = 'full', context, emit = () => {} } = options
+  const { reviewId, prUrl, mode = 'full', context: _context, emit: _emit = () => {} } = options
 
   return withSpan(
     'harness.review',
