@@ -127,8 +127,18 @@ export function createGithubTools(
 
 // ── Octokit factory ───────────────────────────────────────────────────────────
 
-export function createOctokit(): Octokit | null {
-  const token = process.env.GITHUB_TOKEN
-  if (!token) return null
-  return new Octokit({ auth: token })
+/**
+ * Create an authenticated Octokit instance.
+ *
+ * Token priority:
+ *   1. `token` argument — GitHub OAuth access token from the user's session
+ *      (set when the user authenticates via GitHub OAuth in the web app).
+ *   2. `GITHUB_TOKEN` env var — static PAT for CLI usage and local dev without OAuth.
+ *
+ * Returns null if no token is available; callers degrade gracefully (no GitHub tools).
+ */
+export function createOctokit(token?: string | null): Octokit | null {
+  const auth = token ?? process.env.GITHUB_TOKEN
+  if (!auth) return null
+  return new Octokit({ auth })
 }

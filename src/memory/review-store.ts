@@ -58,7 +58,10 @@ export async function completeReview(
 ): Promise<void> {
   const { error } = await createSupabaseClient()
     .from('reviews')
-    .update({ status: 'COMPLETE', result: review as unknown as Record<string, unknown> })
+    .update({
+      status: 'COMPLETE',
+      result: review as unknown as Record<string, unknown>,
+    })
     .eq('id', id)
   if (error) throw new Error(`completeReview failed: ${error.message}`)
 }

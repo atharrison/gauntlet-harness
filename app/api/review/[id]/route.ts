@@ -7,6 +7,7 @@ import {
   failReview,
   getReview,
 } from '../../../../src/memory/review-store'
+import { getGitHubToken } from '../../../../src/lib/supabase/server'
 
 // Allow up to 5 minutes for the full multi-agent review pipeline
 export const maxDuration = 300
@@ -97,15 +98,27 @@ export async function GET(
         return
       }
 
-      // Fresh run — create the review row, then run the pipeline
+      // Fresh run — create the review row, then run the pipeline.
+      // If this fails (e.g. wrong Supabase key, RLS error) we surface it
+      // immediately rather than silently running a review that can't be finalized.
       try {
         await createReview(reviewId, prUrl, mode)
       } catch (err) {
-        console.warn(`[review/${reviewId}] createReview failed (continuing):`, err)
+        console.error(`[review/${reviewId}] createReview failed:`, err)
+        send('error', {
+          error:
+            'Failed to initialize review — database write error. Check server logs for details.',
+        })
+        send('done', { reviewId })
+        controller.close()
+        return
       }
 
       try {
-        const context = createReviewContext()
+        // Prefer the OAuth provider token from the user's GitHub session;
+        // falls back to GITHUB_TOKEN env var if not available.
+        const githubToken = await getGitHubToken()
+        const context = createReviewContext(undefined, githubToken)
         const review = await runReview({
           reviewId,
           prUrl,
