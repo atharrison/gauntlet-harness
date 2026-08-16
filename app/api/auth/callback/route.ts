@@ -55,8 +55,18 @@ export async function GET(request: NextRequest) {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      const githubLogin: string | undefined = user?.user_metadata?.user_name
-      if (!githubLogin || !allowed.includes(githubLogin)) {
+      // Supabase stores the GitHub login in user_metadata.user_name for most
+      // providers; fall back to identities array in case the shape differs.
+      const githubLogin: string | undefined =
+        user?.user_metadata?.user_name ??
+        user?.identities?.[0]?.identity_data?.user_name
+
+      if (!githubLogin) {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(new URL('/login?error=no_github_login', origin))
+      }
+
+      if (!allowed.includes(githubLogin)) {
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/login?error=unauthorized', origin))
       }
