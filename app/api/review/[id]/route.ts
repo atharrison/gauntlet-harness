@@ -107,7 +107,7 @@ export async function GET(
         console.error(`[review/${reviewId}] createReview failed:`, err)
         send('error', {
           error:
-            'Failed to initialize review in database. Check SUPABASE_SERVICE_ROLE_KEY and run `supabase status` to verify local keys.',
+            'Failed to initialize review — database write error. Check server logs for details.',
         })
         send('done', { reviewId })
         controller.close()

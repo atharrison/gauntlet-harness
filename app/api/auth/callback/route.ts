@@ -68,14 +68,16 @@ export async function GET(request: NextRequest) {
       )?.toLowerCase()
 
       if (!githubLogin) {
-        await supabase.auth.signOut()
+        // Best-effort sign-out — if it fails, middleware will still block the
+        // user on the next request since the session won't pass getUser().
+        await supabase.auth.signOut().catch(() => null)
         return NextResponse.redirect(
           new URL('/login?error=no_github_login', origin)
         )
       }
 
       if (!allowed.includes(githubLogin)) {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut().catch(() => null)
         return NextResponse.redirect(
           new URL('/login?error=unauthorized', origin)
         )

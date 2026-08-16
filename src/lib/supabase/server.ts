@@ -33,12 +33,20 @@ export async function createSupabaseServerClient() {
  * Get the GitHub OAuth provider_token from the current user's session.
  * Returns null if no session or if the provider token has expired/is unavailable.
  * Falls back to GITHUB_TOKEN env var in createOctokit() if null.
+ *
+ * Uses getUser() first to validate the session server-side (getSession() alone
+ * reads from the cookie without revalidating with the Supabase Auth server and
+ * can return stale/expired sessions).
  */
 export async function getGitHubToken(): Promise<string | null> {
   try {
     const supabase = await createSupabaseServerClient()
-    const { data } = await supabase.auth.getSession()
-    return data.session?.provider_token ?? null
+    // Validate the session with the Supabase Auth server before trusting it.
+    const { data: userData, error } = await supabase.auth.getUser()
+    if (error || !userData.user) return null
+    // provider_token is only available on the session object, not the User.
+    const { data: sessionData } = await supabase.auth.getSession()
+    return sessionData.session?.provider_token ?? null
   } catch {
     return null
   }
