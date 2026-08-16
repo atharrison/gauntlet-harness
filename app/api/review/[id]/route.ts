@@ -2,10 +2,11 @@ import { type NextRequest } from 'next/server'
 import { createReviewContext } from '../../../../src/harness/context'
 import { runReview } from '../../../../src/agents/pr-review/coordinator'
 import {
-  cacheReview,
-  getCachedReview,
-  type CachedCheckpoint,
-} from '../../../../src/harness/review-cache'
+  createReview,
+  completeReview,
+  failReview,
+  getReview,
+} from '../../../../src/memory/review-store'
 
 // Allow up to 5 minutes for the full multi-agent review pipeline
 export const maxDuration = 300
@@ -19,6 +20,7 @@ export const maxDuration = 300
  *   checkpoint  { stage, status, reviewId }
  *   finding     { finding: Finding }
  *   alarm       { alarm }
+ *   stats       { tokensUsed, estimatedCostUsd, durationMs, findingsCount, phaseDurations }
  *   error       { error: string }
  *   done        { reviewId }
  */
@@ -33,15 +35,10 @@ export async function GET(
   const mode: 'full' | 'quick' = rawMode === 'quick' ? 'quick' : 'full'
 
   const encoder = new TextEncoder()
-  // Accumulate checkpoint events emitted during a fresh run so they can be
-  // faithfully replayed on cache hits rather than reconstructed from a
-  // hardcoded agent list.
-  const checkpointLog: CachedCheckpoint[] = []
 
   const stream = new ReadableStream({
     async start(controller) {
       function send(event: string, data: unknown) {
-        if (event === 'checkpoint') checkpointLog.push(data as CachedCheckpoint)
         controller.enqueue(
           encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
         )
@@ -56,35 +53,55 @@ export async function GET(
         return
       }
 
-      // If this review was already completed, replay from cache instantly
-      // rather than re-running the agents (handles page refresh / re-visits).
-      const cached = getCachedReview(reviewId)
-      if (cached) {
-        try {
-          send('connected', {
-            reviewId,
-            prUrl,
-            cached: true,
-            message: 'Loaded from cache',
-          })
-          // Replay the exact checkpoint sequence from the original run —
-          // preserves agent count and order without hardcoding agent names.
-          for (const cp of cached.checkpoints) {
-            send('checkpoint', cp)
-          }
-          const allFindings = [
-            ...cached.review.blockingIssues,
-            ...cached.review.suggestions,
-            ...cached.review.nits,
-          ]
-          for (const finding of allFindings) {
-            send('finding', { finding })
-          }
-          send('done', { reviewId })
-        } finally {
-          controller.close()
+      // Check if this review already completed (page refresh / re-visit).
+      // Load from Supabase and replay findings without re-running the pipeline.
+      let existing = null
+      try {
+        existing = await getReview(reviewId)
+      } catch (err) {
+        console.warn(`[review/${reviewId}] getReview check failed:`, err)
+      }
+
+      if (existing?.status === 'COMPLETE' && existing.result) {
+        const review = existing.result
+        send('connected', {
+          reviewId,
+          prUrl,
+          cached: true,
+          message: 'Loaded from database',
+        })
+        // Replay synthetic pipeline checkpoints so the UI renders all stages
+        const stages = ['INPUT', 'CONTEXT', 'DOMAIN', 'OUTPUT']
+        for (const stage of stages) {
+          send('checkpoint', { stage, status: 'PASS', reviewId })
         }
+        const allFindings = [
+          ...(review.blockingIssues ?? []),
+          ...(review.suggestions ?? []),
+          ...(review.nits ?? []),
+        ]
+        for (const finding of allFindings) {
+          send('finding', { finding })
+        }
+        send('done', { reviewId })
+        controller.close()
         return
+      }
+
+      if (existing?.status === 'ERROR') {
+        send('error', {
+          error: existing.error_message ?? 'Review failed previously.',
+        })
+        send('done', { reviewId })
+        controller.close()
+        return
+      }
+
+      // Fresh run — create the review row, then run the pipeline
+      try {
+        await createReview(reviewId, prUrl, mode)
+      } catch (err) {
+        console.warn(`[review/${reviewId}] createReview failed (continuing):`, err)
       }
 
       try {
@@ -96,9 +113,12 @@ export async function GET(
           context,
           emit: send,
         })
-        cacheReview(reviewId, prUrl, review, checkpointLog)
+        await completeReview(reviewId, review).catch(err =>
+          console.error(`[review/${reviewId}] completeReview failed:`, err)
+        )
       } catch (err) {
         console.error(`[review/${reviewId}] runReview failed:`, err)
+        await failReview(reviewId, String(err)).catch(() => {})
         send('error', { error: String(err) })
         send('done', { reviewId })
       } finally {

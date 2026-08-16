@@ -55,6 +55,9 @@ module.exports = tseslint.config(
       'jest.config.js',
       'postcss.config.mjs',
       '__mocks__/**',
+      'next-env.d.ts',      // Next.js generated — uses triple-slash refs by design
+      'supabase/.temp/**',  // Supabase CLI local temp files
+      'supabase/.branches/**',
     ],
   }
 )
