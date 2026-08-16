@@ -13,7 +13,9 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
   const errorKey = searchParams.get('error')
-  const errorMessage = errorKey ? (ERROR_MESSAGES[errorKey] ?? 'An error occurred. Please try again.') : null
+  const errorMessage = errorKey
+    ? (ERROR_MESSAGES[errorKey] ?? 'An error occurred. Please try again.')
+    : null
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,8 +62,8 @@ function LoginForm() {
         </button>
 
         <p className="mt-6 text-center text-xs text-gray-500">
-          Requests the <code className="text-gray-400">repo</code> scope to read PRs and post
-          review comments.
+          Requests the <code className="text-gray-400">repo</code> scope to read
+          PRs and post review comments.
         </p>
       </div>
     </div>

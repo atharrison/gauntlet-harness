@@ -54,7 +54,8 @@ export async function middleware(request: NextRequest) {
 
     // Page routes: redirect to login, preserving the intended destination
     const isProtectedPage =
-      pathname === '/' || PROTECTED_PAGES.filter(p => p !== '/').some(p => pathname.startsWith(p))
+      pathname === '/' ||
+      PROTECTED_PAGES.filter(p => p !== '/').some(p => pathname.startsWith(p))
     if (isProtectedPage) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('next', pathname)

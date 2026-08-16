@@ -38,7 +38,10 @@ export interface ReviewContext {
 
 // ── buildRegistry — assemble all tools given a dep set ────────────────────────
 
-export function buildRegistry(deps: ReviewDeps, githubToken?: string | null): ToolRegistry {
+export function buildRegistry(
+  deps: ReviewDeps,
+  githubToken?: string | null
+): ToolRegistry {
   return {
     ...createGithubTools(createOctokit(githubToken)),
     ...createMemoryTools(deps.memory),

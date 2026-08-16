@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   // `new URL(absolute, origin)` would follow the absolute URL; we only allow
   // paths that start with '/' but not '//' (protocol-relative redirect).
   const rawNext = searchParams.get('next') ?? '/'
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
+  const next =
+    rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
   if (code) {
     const cookieStore = await cookies()
@@ -68,12 +69,16 @@ export async function GET(request: NextRequest) {
 
       if (!githubLogin) {
         await supabase.auth.signOut()
-        return NextResponse.redirect(new URL('/login?error=no_github_login', origin))
+        return NextResponse.redirect(
+          new URL('/login?error=no_github_login', origin)
+        )
       }
 
       if (!allowed.includes(githubLogin)) {
         await supabase.auth.signOut()
-        return NextResponse.redirect(new URL('/login?error=unauthorized', origin))
+        return NextResponse.redirect(
+          new URL('/login?error=unauthorized', origin)
+        )
       }
     }
 

@@ -60,7 +60,10 @@ export async function POST(
     reviewRow = await getReview(reviewId)
   } catch (err) {
     console.error(`[finalize/${reviewId}] getReview failed:`, err)
-    return NextResponse.json({ error: 'Failed to load review.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to load review.' },
+      { status: 500 }
+    )
   }
   if (!reviewRow || reviewRow.status !== 'COMPLETE' || !reviewRow.result) {
     return NextResponse.json(
