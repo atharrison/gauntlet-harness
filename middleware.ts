@@ -5,13 +5,13 @@ import { type NextRequest, NextResponse } from 'next/server'
  * Page routes that redirect unauthenticated users to /login.
  * '/' is included so the PR URL form isn't accessible without auth.
  */
-const PROTECTED_PAGES = ['/', '/review']
+const PROTECTED_PAGES = ['/', '/review', '/queue']
 
 /**
  * API routes that return 401 JSON for unauthenticated requests.
  * (A browser redirect is useless for fetch() callers.)
  */
-const PROTECTED_API_PREFIXES = ['/api/review']
+const PROTECTED_API_PREFIXES = ['/api/review', '/api/queue']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

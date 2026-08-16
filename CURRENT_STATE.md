@@ -4,6 +4,58 @@
 
 ---
 
+# Session State — 2026-08-15 23:11
+
+## Context
+
+v1 MVP sprint — Weekend 1 (Aug 15). Picked up from prior session where ATH-12 (Supabase review store) had just been merged. Today's session completed ATH-13 (GitHub OAuth) through 5 re-review rounds of self-review on PR #16, then merged to main.
+
+## Decisions Made
+
+- **GitHub OAuth via Supabase** (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — intentional v2 naming, not the old `ANON_KEY`): login page, callback route, middleware, UserMenu component.
+- **`gh_provider_token` separate httpOnly cookie**: Supabase drops `provider_token` from session on every token refresh. We store it in a separate `gh_provider_token` cookie (8h TTL) during the callback so `getGitHubToken()` works across requests.
+- **`/api/auth/signout` route**: Server-side POST handler clears both the Supabase session and the `gh_provider_token` httpOnly cookie (client JS can't delete httpOnly cookies). Returns 303 to ensure browser GETs `/login`.
+- **`ALLOWED_GITHUB_USERS` env var stopgap**: Phase 1 allowlist — comma-separated GitHub logins, normalized to lowercase. Leave empty for open access (local dev). ATH-26 will replace with DB-backed invite system.
+- **`denyAndRedirect` helper in callback**: Consolidates signOut + cookie delete + redirect into one awaited helper. Ensures denied users leave with neither a Supabase session nor a `gh_provider_token` cookie.
+- **Missing ATH-12 migrations recovered**: `20260815020000` and `20260815030000` were committed to ATH-12 branch *after* the PR merged, so ATH-13 didn't have them. Cherry-picked the files onto ATH-13 so local migration history stays in sync.
+- **ATH-18 comment added**: Captured the "per-PR finding history for re-reviews" insight from today's 5 review rounds — `review_history` table already has the data, context agent just needs to query by PR URL on re-review.
+
+## Tickets Touched
+
+- **ATH-13** ✅ MERGED — GitHub OAuth authentication via Supabase Auth (PR #16)
+- **ATH-26** (partial) — `ALLOWED_GITHUB_USERS` stopgap implemented as Phase 1; full invite system still pending
+
+## What Was Tried and Abandoned
+
+- Multiple AI review false positives encountered and documented (4 occurrences of `PUBLISHABLE_KEY` false alarm, Phase 2 scope confusion, missing-await false positive). Pattern: each re-review round runs fresh with no prior context — see ATH-18 comment.
+
+## Open Questions
+
+- `gh_provider_token` 8h TTL: GitHub OAuth tokens don't expire on their own, but if Supabase session expires before 8h the token cookie could linger. Acceptable for now; revisit in ATH-26.
+- No error message display for `no_github_login` error code on the login page — only `unauthorized` and `auth_failed` have human-readable strings in `ERROR_MESSAGES`.
+
+## Next Steps
+
+1. **ATH-14** — PR Review Queue page (UI for tracked_prs)
+2. **ATH-15** — Wire tracked_prs to review lifecycle
+3. **ATH-16** — GitHub webhook receiver
+4. **ATH-17** — Conventions, Performance, Style agents
+5. **ATH-18** — Wire search_past_reviews into context agent (+ per-PR re-review history per today's comment)
+6. **ATH-26** — Full user access control / invite system
+
+## Key Files
+
+- `app/login/page.tsx` — GitHub OAuth login page (validates `next` param)
+- `app/api/auth/callback/route.ts` — OAuth callback: exchange code, store `gh_provider_token`, allowlist check, `denyAndRedirect` helper
+- `app/api/auth/signout/route.ts` — Server-side sign-out, clears both cookies, 303 redirect
+- `app/components/UserMenu.tsx` — Avatar + dropdown, POSTs to `/api/auth/signout`
+- `src/lib/supabase/server.ts` — `createSupabaseServerClient()`, `getGitHubToken()`, `GH_TOKEN_COOKIE` const
+- `middleware.ts` — Protects `/`, `/review/*` (redirect to login) and `/api/review/*` (401 JSON)
+- `supabase/migrations/20260815020000_add_service_role_policies.sql` — service_role RLS policies
+- `supabase/migrations/20260815030000_grant_table_privileges.sql` — GRANT ALL for service_role
+
+---
+
 # Session State — 2026-06-13 16:24
 
 ## Context

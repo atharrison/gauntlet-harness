@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   // Validate `next` is a relative path to prevent open-redirect attacks.
   // `new URL(absolute, origin)` would follow the absolute URL; we only allow
   // paths that start with '/' but not '//' (protocol-relative redirect).
-  const rawNext = searchParams.get('next') ?? '/'
+  // Default to /queue — the PR review queue is the primary landing page post-login.
+  const rawNext = searchParams.get('next') ?? '/queue'
   const next =
     rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 

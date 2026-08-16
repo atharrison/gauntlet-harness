@@ -35,6 +35,18 @@ export default async function RootLayout({
             </span>
             <nav className="ml-4 flex items-center gap-5">
               <Link
+                href="/queue"
+                className="text-sm text-gray-400 transition-colors hover:text-gray-200"
+              >
+                Queue
+              </Link>
+              <Link
+                href="/"
+                className="text-sm text-gray-400 transition-colors hover:text-gray-200"
+              >
+                New Review
+              </Link>
+              <Link
                 href="/architecture"
                 className="text-sm text-gray-400 transition-colors hover:text-gray-200"
               >
