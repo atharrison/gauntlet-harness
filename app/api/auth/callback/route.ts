@@ -39,11 +39,32 @@ export async function GET(request: NextRequest) {
     )
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(new URL(next, origin))
+    if (error) {
+      return NextResponse.redirect(new URL('/login?error=auth_failed', origin))
     }
+
+    // Allowlist check — Phase 1 stopgap until ATH-26 ships a proper invite system.
+    // Set ALLOWED_GITHUB_USERS=login1,login2 in env to restrict access.
+    // Leave unset (or empty) to allow all GitHub users (local dev only).
+    const allowed = (process.env.ALLOWED_GITHUB_USERS ?? '')
+      .split(',')
+      .map(u => u.trim())
+      .filter(Boolean)
+
+    if (allowed.length > 0) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const githubLogin: string | undefined = user?.user_metadata?.user_name
+      if (!githubLogin || !allowed.includes(githubLogin)) {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(new URL('/login?error=unauthorized', origin))
+      }
+    }
+
+    return NextResponse.redirect(new URL(next, origin))
   }
 
-  // Code missing or exchange failed — redirect to login with an error hint
+  // Code missing — redirect to login with an error hint
   return NextResponse.redirect(new URL('/login?error=auth_failed', origin))
 }

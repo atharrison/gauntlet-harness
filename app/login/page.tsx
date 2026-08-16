@@ -4,9 +4,16 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
+const ERROR_MESSAGES: Record<string, string> = {
+  unauthorized: 'Your GitHub account is not authorized to access this tool.',
+  auth_failed: 'GitHub sign-in failed. Please try again.',
+}
+
 function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
+  const errorKey = searchParams.get('error')
+  const errorMessage = errorKey ? (ERROR_MESSAGES[errorKey] ?? 'An error occurred. Please try again.') : null
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,6 +39,12 @@ function LoginForm() {
             Sign in with GitHub to start reviewing pull requests.
           </p>
         </div>
+
+        {errorMessage && (
+          <div className="mb-4 rounded-lg border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-400">
+            {errorMessage}
+          </div>
+        )}
 
         <button
           onClick={signInWithGitHub}
