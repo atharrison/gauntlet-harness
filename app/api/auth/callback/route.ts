@@ -12,7 +12,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  // Validate `next` is a relative path to prevent open-redirect attacks.
+  // `new URL(absolute, origin)` would follow the absolute URL; we only allow
+  // paths that start with '/' but not '//' (protocol-relative redirect).
+  const rawNext = searchParams.get('next') ?? '/'
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
   if (code) {
     const cookieStore = await cookies()
@@ -25,14 +29,12 @@ export async function GET(request: NextRequest) {
             return cookieStore.getAll()
           },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {
-              // No-op when called from a Server Component — cookies are set
-              // by the middleware on the response instead.
-            }
+            // Route Handlers can always write cookies — no try/catch needed here.
+            // A failure would mean the session cookie wasn't set, causing getUser()
+            // to return null and silently denying all users when an allowlist is active.
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
           },
         },
       }
@@ -46,9 +48,11 @@ export async function GET(request: NextRequest) {
     // Allowlist check — Phase 1 stopgap until ATH-26 ships a proper invite system.
     // Set ALLOWED_GITHUB_USERS=login1,login2 in env to restrict access.
     // Leave unset (or empty) to allow all GitHub users (local dev only).
+    // Normalize to lowercase — GitHub usernames are case-insensitive and the
+    // OAuth provider_token may return them in varying casing.
     const allowed = (process.env.ALLOWED_GITHUB_USERS ?? '')
       .split(',')
-      .map(u => u.trim())
+      .map(u => u.trim().toLowerCase())
       .filter(Boolean)
 
     if (allowed.length > 0) {
@@ -57,9 +61,10 @@ export async function GET(request: NextRequest) {
       } = await supabase.auth.getUser()
       // Supabase stores the GitHub login in user_metadata.user_name for most
       // providers; fall back to identities array in case the shape differs.
-      const githubLogin: string | undefined =
+      const githubLogin: string | undefined = (
         user?.user_metadata?.user_name ??
         user?.identities?.[0]?.identity_data?.user_name
+      )?.toLowerCase()
 
       if (!githubLogin) {
         await supabase.auth.signOut()
