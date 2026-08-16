@@ -90,8 +90,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL(`/login?error=${error}`, origin))
       }
 
-      if (!githubLogin) return denyAndRedirect('no_github_login')
-      if (!allowed.includes(githubLogin)) return denyAndRedirect('unauthorized')
+      if (!githubLogin) return await denyAndRedirect('no_github_login')
+      if (!allowed.includes(githubLogin))
+        return await denyAndRedirect('unauthorized')
     }
 
     return NextResponse.redirect(new URL(next, origin))
