@@ -6,6 +6,7 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
   collectCoverageFrom: [
     'src/**/*.ts',
+    'app/api/**/*.ts',
     '!src/**/*.d.ts',
     '!src/**/*.test.ts',
     '!src/cli/index.ts',

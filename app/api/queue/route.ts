@@ -4,6 +4,7 @@ import {
   createSupabaseServiceRoleClient,
   getGitHubToken,
 } from '../../../src/lib/supabase/server'
+import { parsePrUrl } from '../../../src/lib/queue'
 
 /**
  * GET /api/queue
@@ -62,11 +63,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'prUrl is required' }, { status: 400 })
   }
 
-  // Parse github.com/owner/repo/pull/number
-  const match = prUrl.match(
-    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/
-  )
-  if (!match) {
+  const parsed = parsePrUrl(prUrl)
+  if (!parsed) {
     return NextResponse.json(
       {
         error:
@@ -75,8 +73,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-  const [, owner, repo, prNumberStr] = match
-  const pr_number = parseInt(prNumberStr, 10)
+  const { owner, repo, pr_number, canonical_url } = parsed
 
   // Attempt to fetch PR metadata from GitHub (best-effort)
   let pr_title: string | null = null
@@ -113,7 +110,7 @@ export async function POST(request: NextRequest) {
         owner,
         repo,
         pr_number,
-        pr_url: prUrl.split('?')[0], // strip any query params
+        pr_url: canonical_url,
         pr_title,
         pr_author,
         pr_opened_at,

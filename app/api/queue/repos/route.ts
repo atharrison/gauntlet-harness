@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '../../../../src/lib/supabase/server'
+import { parseRepoInput } from '../../../../src/lib/queue'
 
 /**
  * GET /api/queue/repos
@@ -46,26 +47,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  let owner: string | undefined = body.owner?.trim()
-  let name: string | undefined = body.name?.trim()
-
-  // Accept github.com/owner/name URL format
-  if (!owner && !name && body.repoUrl) {
-    const match = body.repoUrl.match(
-      /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/
-    )
-    if (match) {
-      owner = match[1]
-      name = match[2]
-    }
-  }
-
-  if (!owner || !name) {
+  const repoIdentifier = parseRepoInput(body)
+  if (!repoIdentifier) {
     return NextResponse.json(
       { error: 'Provide owner + name, or a repoUrl (github.com/owner/name)' },
       { status: 400 }
     )
   }
+  const { owner, name } = repoIdentifier
 
   const { data, error } = await supabase
     .from('configured_repos')
