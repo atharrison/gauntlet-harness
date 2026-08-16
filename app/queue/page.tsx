@@ -10,7 +10,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function QueuePage() {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const service = createSupabaseServiceRoleClient()
   const { data: prs } = await service
@@ -29,12 +31,15 @@ export default async function QueuePage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">PR Review Queue</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            PR Review Queue
+          </h1>
           <p className="mt-1 text-sm text-gray-400">
             {prs?.length ?? 0} tracked PR{(prs?.length ?? 0) !== 1 ? 's' : ''}
             {(repos?.length ?? 0) > 0 && (
               <span className="ml-2 text-gray-600">
-                · {repos?.length} configured repo{(repos?.length ?? 0) !== 1 ? 's' : ''}
+                · {repos?.length} configured repo
+                {(repos?.length ?? 0) !== 1 ? 's' : ''}
               </span>
             )}
           </p>

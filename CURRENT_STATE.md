@@ -17,7 +17,7 @@ v1 MVP sprint — Weekend 1 (Aug 15). Picked up from prior session where ATH-12 
 - **`/api/auth/signout` route**: Server-side POST handler clears both the Supabase session and the `gh_provider_token` httpOnly cookie (client JS can't delete httpOnly cookies). Returns 303 to ensure browser GETs `/login`.
 - **`ALLOWED_GITHUB_USERS` env var stopgap**: Phase 1 allowlist — comma-separated GitHub logins, normalized to lowercase. Leave empty for open access (local dev). ATH-26 will replace with DB-backed invite system.
 - **`denyAndRedirect` helper in callback**: Consolidates signOut + cookie delete + redirect into one awaited helper. Ensures denied users leave with neither a Supabase session nor a `gh_provider_token` cookie.
-- **Missing ATH-12 migrations recovered**: `20260815020000` and `20260815030000` were committed to ATH-12 branch *after* the PR merged, so ATH-13 didn't have them. Cherry-picked the files onto ATH-13 so local migration history stays in sync.
+- **Missing ATH-12 migrations recovered**: `20260815020000` and `20260815030000` were committed to ATH-12 branch _after_ the PR merged, so ATH-13 didn't have them. Cherry-picked the files onto ATH-13 so local migration history stays in sync.
 - **ATH-18 comment added**: Captured the "per-PR finding history for re-reviews" insight from today's 5 review rounds — `review_history` table already has the data, context agent just needs to query by PR URL on re-review.
 
 ## Tickets Touched

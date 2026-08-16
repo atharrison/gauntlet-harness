@@ -12,14 +12,20 @@ import {
  */
 export async function GET(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const statusFilter = searchParams.get('status')
 
   const service = createSupabaseServiceRoleClient()
-  let query = service.from('tracked_prs').select('*').order('created_at', { ascending: false })
+  let query = service
+    .from('tracked_prs')
+    .select('*')
+    .order('created_at', { ascending: false })
   if (statusFilter) query = query.eq('status', statusFilter)
 
   const { data, error } = await query
@@ -38,8 +44,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let body: { prUrl?: string }
   try {
@@ -59,7 +68,10 @@ export async function POST(request: NextRequest) {
   )
   if (!match) {
     return NextResponse.json(
-      { error: 'Invalid GitHub PR URL. Expected: https://github.com/owner/repo/pull/number' },
+      {
+        error:
+          'Invalid GitHub PR URL. Expected: https://github.com/owner/repo/pull/number',
+      },
       { status: 400 }
     )
   }
@@ -78,7 +90,11 @@ export async function POST(request: NextRequest) {
     const token = process.env.GITHUB_TOKEN ?? (await getGitHubToken())
     if (token) {
       const octokit = new Octokit({ auth: token })
-      const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pr_number })
+      const { data: prData } = await octokit.pulls.get({
+        owner,
+        repo,
+        pull_number: pr_number,
+      })
       pr_title = prData.title
       pr_author = prData.user?.login ?? null
       pr_opened_at = prData.created_at

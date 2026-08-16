@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import {
-  createSupabaseServerClient,
-} from '../../../../src/lib/supabase/server'
+import { createSupabaseServerClient } from '../../../../src/lib/supabase/server'
 
 /**
  * GET /api/queue/repos
@@ -9,8 +7,11 @@ import {
  */
 export async function GET() {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data, error } = await supabase
     .from('configured_repos')
@@ -32,8 +33,11 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let body: { owner?: string; name?: string; repoUrl?: string }
   try {
@@ -47,7 +51,9 @@ export async function POST(request: NextRequest) {
 
   // Accept github.com/owner/name URL format
   if (!owner && !name && body.repoUrl) {
-    const match = body.repoUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/)
+    const match = body.repoUrl.match(
+      /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/
+    )
     if (match) {
       owner = match[1]
       name = match[2]
@@ -69,7 +75,10 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     if (error.code === '23505') {
-      return NextResponse.json({ error: `${owner}/${name} is already configured` }, { status: 409 })
+      return NextResponse.json(
+        { error: `${owner}/${name} is already configured` },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

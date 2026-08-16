@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import {
-  createSupabaseServerClient,
-} from '../../../../../src/lib/supabase/server'
+import { createSupabaseServerClient } from '../../../../../src/lib/supabase/server'
 
 /**
  * DELETE /api/queue/repos/[id]
@@ -12,8 +10,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user)
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
 

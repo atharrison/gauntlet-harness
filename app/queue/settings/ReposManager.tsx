@@ -63,7 +63,12 @@ export default function ReposManager({
   }
 
   async function handleRemove(repo: ConfiguredRepo) {
-    if (!confirm(`Remove ${repo.owner}/${repo.name}?\n\nExisting tracked PRs for this repo will not be deleted.`)) return
+    if (
+      !confirm(
+        `Remove ${repo.owner}/${repo.name}?\n\nExisting tracked PRs for this repo will not be deleted.`
+      )
+    )
+      return
     setRemovingId(repo.id)
     try {
       await fetch(`/api/queue/repos/${repo.id}`, { method: 'DELETE' })

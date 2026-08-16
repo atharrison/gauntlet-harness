@@ -1,7 +1,5 @@
 import Link from 'next/link'
-import {
-  createSupabaseServerClient,
-} from '../../../src/lib/supabase/server'
+import { createSupabaseServerClient } from '../../../src/lib/supabase/server'
 import ReposManager from './ReposManager'
 
 export const dynamic = 'force-dynamic'
@@ -24,11 +22,15 @@ export default async function QueueSettingsPage() {
           ← Queue
         </Link>
         <span className="text-gray-700">/</span>
-        <h1 className="text-xl font-bold tracking-tight text-white">Settings</h1>
+        <h1 className="text-xl font-bold tracking-tight text-white">
+          Settings
+        </h1>
       </div>
 
       <section>
-        <h2 className="mb-1 text-base font-semibold text-white">Configured Repos</h2>
+        <h2 className="mb-1 text-base font-semibold text-white">
+          Configured Repos
+        </h2>
         <p className="mb-4 text-sm text-gray-400">
           Repos registered for PR tracking. PRs are added automatically when a
           webhook fires, or manually from the queue page.

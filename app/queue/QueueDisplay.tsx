@@ -21,16 +21,30 @@ interface TrackedPr {
 type RepoGroup = { key: string; owner: string; repo: string; prs: TrackedPr[] }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  OPEN: { label: 'Open', className: 'bg-blue-900/50 text-blue-300 border-blue-800' },
-  IN_REVIEW: { label: 'In Review', className: 'bg-yellow-900/50 text-yellow-300 border-yellow-800' },
-  REVIEWED: { label: 'Reviewed', className: 'bg-green-900/50 text-green-300 border-green-800' },
-  CLOSED: { label: 'Closed', className: 'bg-gray-800/80 text-gray-500 border-gray-700' },
+  OPEN: {
+    label: 'Open',
+    className: 'bg-blue-900/50 text-blue-300 border-blue-800',
+  },
+  IN_REVIEW: {
+    label: 'In Review',
+    className: 'bg-yellow-900/50 text-yellow-300 border-yellow-800',
+  },
+  REVIEWED: {
+    label: 'Reviewed',
+    className: 'bg-green-900/50 text-green-300 border-green-800',
+  },
+  CLOSED: {
+    label: 'Closed',
+    className: 'bg-gray-800/80 text-gray-500 border-gray-700',
+  },
 }
 
 function StatusBadge({ status }: { status: string }) {
   const badge = STATUS_BADGE[status] ?? STATUS_BADGE['OPEN']
   return (
-    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+    <span
+      className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium ${badge.className}`}
+    >
       {badge.label}
     </span>
   )
@@ -67,7 +81,10 @@ export default function QueueDisplay({
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   async function handleRemove(pr: TrackedPr) {
-    if (!confirm(`Remove ${pr.owner}/${pr.repo} #${pr.pr_number} from the queue?`)) return
+    if (
+      !confirm(`Remove ${pr.owner}/${pr.repo} #${pr.pr_number} from the queue?`)
+    )
+      return
     setRemovingId(pr.id)
     try {
       await fetch(`/api/queue/${pr.id}`, { method: 'DELETE' })
@@ -84,7 +101,8 @@ export default function QueueDisplay({
       <div className="rounded-lg border border-dashed border-gray-800 py-16 text-center">
         <p className="text-gray-500">No PRs tracked yet.</p>
         <p className="mt-1 text-sm text-gray-600">
-          Paste a GitHub PR URL above to add one, or configure webhooks in Settings.
+          Paste a GitHub PR URL above to add one, or configure webhooks in
+          Settings.
         </p>
       </div>
     )
@@ -144,7 +162,8 @@ export default function QueueDisplay({
                       )}
                       {pr.review_count > 0 && (
                         <span className="text-xs text-gray-600">
-                          {pr.review_count} review{pr.review_count !== 1 ? 's' : ''}
+                          {pr.review_count} review
+                          {pr.review_count !== 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
