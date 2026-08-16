@@ -2,10 +2,16 @@ import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
 /**
- * Routes that require an authenticated Supabase session.
- * Everything else (/, /blog/*, /login, /api/auth/*) is public.
+ * Page routes that redirect unauthenticated users to /login.
+ * '/' is included so the PR URL form isn't accessible without auth.
  */
-const PROTECTED_PREFIXES = ['/review', '/api/review']
+const PROTECTED_PAGES = ['/', '/review']
+
+/**
+ * API routes that return 401 JSON for unauthenticated requests.
+ * (A browser redirect is useless for fetch() callers.)
+ */
+const PROTECTED_API_PREFIXES = ['/api/review']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -40,12 +46,20 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isProtected = PROTECTED_PREFIXES.some(p => pathname.startsWith(p))
+  if (!user) {
+    // API routes: return 401 JSON — a redirect is useless for fetch() callers
+    if (PROTECTED_API_PREFIXES.some(p => pathname.startsWith(p))) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-  if (isProtected && !user) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', pathname)
-    return NextResponse.redirect(loginUrl)
+    // Page routes: redirect to login, preserving the intended destination
+    const isProtectedPage =
+      pathname === '/' || PROTECTED_PAGES.filter(p => p !== '/').some(p => pathname.startsWith(p))
+    if (isProtectedPage) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
   }
 
   return supabaseResponse
