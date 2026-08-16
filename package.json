@@ -17,7 +17,7 @@
     "format:check": "prettier --check \"**/*.{ts,js,tsx,jsx,json,md,sql}\"",
     "review": "ts-node --esm src/cli/index.ts",
     "pdf": "./scripts/generate-pdf.sh",
-    "db:start": "supabase start",
+    "db:start": "dotenvx run -- supabase start",
     "db:stop": "supabase stop",
     "db:migrate": "supabase db push",
     "db:migrate:local": "supabase migration up",

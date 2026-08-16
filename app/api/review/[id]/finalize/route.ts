@@ -11,6 +11,7 @@ import {
   buildSubmission,
 } from '../../../../../src/agents/pr-review/approval'
 import { createOctokit } from '../../../../../src/tools/github'
+import { getGitHubToken } from '../../../../../src/lib/supabase/server'
 import type { FindingDecision } from '../../../../../src/agents/pr-review/schema'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ export async function POST(
     )
   }
   const memory = createMemoryStore()
+  const githubToken = await getGitHubToken()
 
   if (approve) {
     // ── Approve path: no findings, post LGTM comment ────────────────────────
@@ -145,7 +147,7 @@ export async function POST(
 
     let commentResult: unknown = null
     if (postComment) {
-      const octokit = createOctokit()
+      const octokit = createOctokit(githubToken)
       if (!octokit) {
         commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
       } else if (!prUrlParts) {
@@ -232,7 +234,7 @@ export async function POST(
 
   let commentResult: unknown = null
   if (postComment) {
-    const octokit = createOctokit()
+    const octokit = createOctokit(githubToken)
     if (!octokit) {
       commentResult = { skipped: true, reason: 'GITHUB_TOKEN not configured' }
     } else if (!prUrlParts) {

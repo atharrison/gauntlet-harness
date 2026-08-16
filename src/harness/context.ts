@@ -38,9 +38,9 @@ export interface ReviewContext {
 
 // ── buildRegistry — assemble all tools given a dep set ────────────────────────
 
-export function buildRegistry(deps: ReviewDeps): ToolRegistry {
+export function buildRegistry(deps: ReviewDeps, githubToken?: string | null): ToolRegistry {
   return {
-    ...createGithubTools(createOctokit()),
+    ...createGithubTools(createOctokit(githubToken)),
     ...createMemoryTools(deps.memory),
     ...createTicketTools(),
   }
@@ -49,7 +49,8 @@ export function buildRegistry(deps: ReviewDeps): ToolRegistry {
 // ── createReviewContext — the single factory both CLI and web call ─────────────
 
 export function createReviewContext(
-  overrides?: Partial<ReviewDeps>
+  overrides?: Partial<ReviewDeps>,
+  githubToken?: string | null
 ): ReviewContext {
   const deps: ReviewDeps = {
     model: overrides?.model ?? createModelClient(),
@@ -57,7 +58,7 @@ export function createReviewContext(
     checkpoints: overrides?.checkpoints ?? new InMemoryCheckpointStore(),
   }
 
-  const registry = buildRegistry(deps)
+  const registry = buildRegistry(deps, githubToken)
 
   const dispatcher =
     (reviewId: string): ToolDispatcher =>

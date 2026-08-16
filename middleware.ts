@@ -1,7 +1,15 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
+/**
+ * Routes that require an authenticated Supabase session.
+ * Everything else (/, /blog/*, /login, /api/auth/*) is public.
+ */
+const PROTECTED_PREFIXES = ['/review', '/api/review']
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -25,8 +33,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session — keeps cookies alive on the client
-  await supabase.auth.getUser()
+  // Always refresh the session — keeps cookies alive and validates the token.
+  // Use getUser() (not getSession()) for server-side auth checks: getUser()
+  // re-validates the JWT with Supabase, while getSession() trusts the cookie.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const isProtected = PROTECTED_PREFIXES.some(p => pathname.startsWith(p))
+
+  if (isProtected && !user) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
 
   return supabaseResponse
 }
@@ -34,7 +54,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except static assets and Next.js internals.
+     * Match all paths except Next.js internals and static assets.
+     * Must run on all routes so session cookies are refreshed everywhere.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
