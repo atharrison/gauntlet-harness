@@ -71,4 +71,53 @@ describe('toToolDefinitions', () => {
     expect(defs).toHaveLength(2)
     expect(defs.find(d => d.name === 'echo')).toBeDefined()
   })
+
+  it('maps all ZodType variants to JSON schema correctly', () => {
+    const complexRegistry: ToolRegistry = {
+      tool: {
+        description: 'Complex schema tool',
+        schema: z.object({
+          numField: z.number(),
+          boolField: z.boolean(),
+          arrField: z.array(z.string()),
+          optField: z.string().optional(),
+          enumField: z.enum(['a', 'b']),
+          nested: z.object({ x: z.string() }),
+          fallback: z.date() as unknown as z.ZodString,
+        }),
+        fn: async () => ({}),
+      },
+    }
+    const [def] = toToolDefinitions(complexRegistry)
+    const props = (def.inputSchema as { properties: Record<string, unknown> })
+      .properties
+    expect(props.numField).toEqual({ type: 'number' })
+    expect(props.boolField).toEqual({ type: 'boolean' })
+    expect(props.arrField).toEqual({ type: 'array', items: { type: 'string' } })
+    expect(props.optField).toEqual({ type: 'string' })
+    expect(props.enumField).toMatchObject({ type: 'string', enum: ['a', 'b'] })
+    expect(props.nested).toMatchObject({ type: 'object' })
+    expect(props.fallback).toEqual({ type: 'string' })
+  })
+})
+
+describe('dispatch — timeout path', () => {
+  it('fires a timeout alarm and returns error-as-data when tool throws timed-out error', async () => {
+    const timeoutRegistry: ToolRegistry = {
+      slow: {
+        description: 'Simulates a timed-out tool',
+        schema: z.object({}),
+        fn: async () => {
+          throw new Error('Tool timed out after 30000ms')
+        },
+      },
+    }
+    const result = await dispatch(
+      { id: 'c5', name: 'slow', args: {} },
+      timeoutRegistry,
+      'rev-1'
+    )
+    const parsed = JSON.parse(result.content)
+    expect(parsed.error).toMatch(/timed out/)
+  })
 })
