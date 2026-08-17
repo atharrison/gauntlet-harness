@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
-import { parsePrUrl } from '../../../src/lib/queue'
-import { createSupabaseServiceRoleClient } from '../../../src/lib/supabase/server'
+import { parsePrUrl } from '../../../../src/lib/queue'
+import { createSupabaseServiceRoleClient } from '../../../../src/lib/supabase/server'
 
 const StartReviewBody = z.object({
   prUrl: z.string().url('prUrl must be a valid GitHub PR URL'),
