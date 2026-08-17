@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function HomePage() {
+function HomePageContent() {
   const router = useRouter()
-  const [prUrl, setPrUrl] = useState('')
+  const searchParams = useSearchParams()
+  const [prUrl, setPrUrl] = useState(searchParams.get('prUrl') ?? '')
   const [quickMode, setQuickMode] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -62,7 +63,7 @@ export default function HomePage() {
         />
 
         {/* Quick mode toggle */}
-        <label className="flex cursor-pointer items-center gap-3 self-start rounded-lg border border-gray-800 bg-gray-900 px-4 py-2.5 hover:border-gray-700 transition-colors">
+        <label className="flex cursor-pointer items-center gap-3 self-start rounded-lg border border-gray-800 bg-gray-900 px-4 py-2.5 transition-colors hover:border-gray-700">
           <div className="relative">
             <input
               type="checkbox"
@@ -70,8 +71,8 @@ export default function HomePage() {
               onChange={e => setQuickMode(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="h-5 w-9 rounded-full bg-gray-700 peer-checked:bg-indigo-600 transition-colors" />
-            <div className="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+            <div className="h-5 w-9 rounded-full bg-gray-700 transition-colors peer-checked:bg-indigo-600" />
+            <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
           </div>
           <span className="text-sm text-gray-300">
             <span className="font-semibold text-white">⚡ Quick mode</span>
@@ -84,7 +85,7 @@ export default function HomePage() {
         </label>
 
         {error && (
-          <p className="rounded-lg bg-red-950/40 border border-red-800 px-4 py-2 text-sm text-red-400">
+          <p className="rounded-lg border border-red-800 bg-red-950/40 px-4 py-2 text-sm text-red-400">
             {error}
           </p>
         )}
@@ -128,5 +129,13 @@ export default function HomePage() {
         ))}
       </div>
     </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <Suspense>
+      <HomePageContent />
+    </Suspense>
   )
 }

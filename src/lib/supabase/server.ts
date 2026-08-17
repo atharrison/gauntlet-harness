@@ -1,7 +1,20 @@
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export const GH_TOKEN_COOKIE = 'gh_provider_token'
+
+/**
+ * Create a Supabase client using the service role key.
+ * Only use in server-side Route Handlers and Server Actions — never in client code.
+ * The service role key bypasses RLS.
+ */
+export function createSupabaseServiceRoleClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 /**
  * Create a Supabase client for use in Next.js Server Components and Route Handlers.
