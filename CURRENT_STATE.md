@@ -1,283 +1,50 @@
 > **Starting a new session?** Run `/current-state` to orient before starting work.
 
-> **Linear note:** The hackathon team key was renamed from `FIR` → `ATH` (team renamed "Fired Festival" → "Team Andrew"). All old hackathon tickets (FIR-1 through FIR-11) are now `ATH-1` through `ATH-11`. New v1 MVP tickets also use the `ATH-` prefix. The project is **Review Harness V1 MVP**.
-
----
-
-# Session State — 2026-08-15 23:11
+# Session State — 2026-08-16 22:15
 
 ## Context
 
-v1 MVP sprint — Weekend 1 (Aug 15). Picked up from prior session where ATH-12 (Supabase review store) had just been merged. Today's session completed ATH-13 (GitHub OAuth) through 5 re-review rounds of self-review on PR #16, then merged to main.
+Gauntlet Harness — AI-powered PR review tool. Sprint 1 MVP tickets are merged. App is live in production on Railway.
+
+## What Was Done This Session
+
+- **ATH-27** (test coverage cleanup) merged via PR #18 — overall coverage 74.7% → 87.6%
+- Responded to PR #18 review: fixed `mockAnonClient.current` baseline reset in GET /api/queue/repos `beforeEach`; clarified false "placeholder tests" finding (reviewer's diff was truncated)
+- Created **ATH-28** — bug ticket for review harness truncating long diff hunks causing false positives
+- **Production deployment** — fixed OAuth redirect loop:
+  - Supabase GitHub provider was not enabled → enabled it with prod OAuth App credentials
+  - Supabase Site URL pointed to localhost → updated to Railway URL
+  - `request.url` in auth callback returned `0.0.0.0:8080` (Railway internal) → fixed by reading `x-forwarded-host`/`x-forwarded-proto` headers, with `NEXT_PUBLIC_SITE_URL` env var as explicit override
+  - Added `NEXT_PUBLIC_SITE_URL` to `.env.example`
+  - Committed as `e0f0d0d Adding NEXT_PUBLIC_SITE_URL`
+- App is now **live and authenticated** at https://gauntlet-review-harness.up.railway.app
 
 ## Decisions Made
 
-- **GitHub OAuth via Supabase** (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — intentional v2 naming, not the old `ANON_KEY`): login page, callback route, middleware, UserMenu component.
-- **`gh_provider_token` separate httpOnly cookie**: Supabase drops `provider_token` from session on every token refresh. We store it in a separate `gh_provider_token` cookie (8h TTL) during the callback so `getGitHubToken()` works across requests.
-- **`/api/auth/signout` route**: Server-side POST handler clears both the Supabase session and the `gh_provider_token` httpOnly cookie (client JS can't delete httpOnly cookies). Returns 303 to ensure browser GETs `/login`.
-- **`ALLOWED_GITHUB_USERS` env var stopgap**: Phase 1 allowlist — comma-separated GitHub logins, normalized to lowercase. Leave empty for open access (local dev). ATH-26 will replace with DB-backed invite system.
-- **`denyAndRedirect` helper in callback**: Consolidates signOut + cookie delete + redirect into one awaited helper. Ensures denied users leave with neither a Supabase session nor a `gh_provider_token` cookie.
-- **Missing ATH-12 migrations recovered**: `20260815020000` and `20260815030000` were committed to ATH-12 branch _after_ the PR merged, so ATH-13 didn't have them. Cherry-picked the files onto ATH-13 so local migration history stays in sync.
-- **ATH-18 comment added**: Captured the "per-PR finding history for re-reviews" insight from today's 5 review rounds — `review_history` table already has the data, context agent just needs to query by PR URL on re-review.
+- `origin` resolution priority in auth callback: `NEXT_PUBLIC_SITE_URL` > `x-forwarded-host` headers > `request.url` origin
+- No `GITHUB_TOKEN` static PAT needed in prod — replaced by GitHub OAuth flow
 
-## Tickets Touched
+## Production Env Variables (Railway)
 
-- **ATH-13** ✅ MERGED — GitHub OAuth authentication via Supabase Auth (PR #16)
-- **ATH-26** (partial) — `ALLOWED_GITHUB_USERS` stopgap implemented as Phase 1; full invite system still pending
+All required vars are set. Key ones added this session:
 
-## What Was Tried and Abandoned
-
-- Multiple AI review false positives encountered and documented (4 occurrences of `PUBLISHABLE_KEY` false alarm, Phase 2 scope confusion, missing-await false positive). Pattern: each re-review round runs fresh with no prior context — see ATH-18 comment.
+- `NEXT_PUBLIC_SITE_URL=https://gauntlet-review-harness.up.railway.app`
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` (prod OAuth App)
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (remote Supabase project `diecadjyrngrlveumsqn`)
+- `ALLOWED_GITHUB_USERS=atharrison`
 
 ## Open Questions
 
-- `gh_provider_token` 8h TTL: GitHub OAuth tokens don't expire on their own, but if Supabase session expires before 8h the token cookie could linger. Acceptable for now; revisit in ATH-26.
-- No error message display for `no_github_login` error code on the login page — only `unauthorized` and `auth_failed` have human-readable strings in `ERROR_MESSAGES`.
+- ATH-28: Where exactly does diff truncation happen in the review pipeline? Likely in `context-agent.ts` or wherever the diff is injected into the prompt.
 
 ## Next Steps
 
-1. **ATH-14** — PR Review Queue page (UI for tracked_prs)
-2. **ATH-15** — Wire tracked_prs to review lifecycle
-3. **ATH-16** — GitHub webhook receiver
-4. **ATH-17** — Conventions, Performance, Style agents
-5. **ATH-18** — Wire search_past_reviews into context agent (+ per-PR re-review history per today's comment)
-6. **ATH-26** — Full user access control / invite system
+- Smoke-test a real PR review end-to-end in production
+- Triage remaining backlog tickets for next sprint
+- Investigate ATH-28 (diff truncation bug)
 
 ## Key Files
 
-- `app/login/page.tsx` — GitHub OAuth login page (validates `next` param)
-- `app/api/auth/callback/route.ts` — OAuth callback: exchange code, store `gh_provider_token`, allowlist check, `denyAndRedirect` helper
-- `app/api/auth/signout/route.ts` — Server-side sign-out, clears both cookies, 303 redirect
-- `app/components/UserMenu.tsx` — Avatar + dropdown, POSTs to `/api/auth/signout`
-- `src/lib/supabase/server.ts` — `createSupabaseServerClient()`, `getGitHubToken()`, `GH_TOKEN_COOKIE` const
-- `middleware.ts` — Protects `/`, `/review/*` (redirect to login) and `/api/review/*` (401 JSON)
-- `supabase/migrations/20260815020000_add_service_role_policies.sql` — service_role RLS policies
-- `supabase/migrations/20260815030000_grant_table_privileges.sql` — GRANT ALL for service_role
-
----
-
-# Session State — 2026-06-13 16:24
-
-## Context
-
-Gauntlet hackathon (Fired Festival) — **submission complete**. All FIR tickets through FIR-10 are merged to `main` and deployed to Railway. Demo video recorded. Project is in a clean, polished, demo-ready state.
-
-## Decisions Made
-
-- **OTel via `withSpan()` + phase spans**: Implemented `src/harness/observability.ts` with `NodeTracerProvider`, `withSpan()` helper, and `harness.review` root span + four child spans per phase. NOT `tracedModelCall()` — that was a design artifact that was never implemented. Default: `ConsoleSpanExporter`; set `OTEL_EXPORTER_OTLP_ENDPOINT` for external backend.
-- **Stats SSE event**: Coordinator emits `stats` event before `done` with `{ tokensUsed, estimatedCostUsd, durationMs, findingsCount, phaseDurations }`. Rendered as per-phase timing bar chart + token/cost summary in ReviewShell sidebar.
-- **Cost tracking via `DomainResult.cost`**: Added `cost` field to `DomainResultSchema`; `parseDomainResult` in correctness/security agents forwards `reply.cost`; coordinator accumulates `totalCost` from all agents.
-- **Quick mode UI toggle**: Home page (`app/page.tsx`) converted to client component with `quickMode` state + custom CSS toggle. Passes `mode` param through start → SSE → finalize. UI shows `⚡ Quick` badge and dims/skips CONTEXT phase row.
-- **Screenshots in `docs/screenshots/`**: Four curated shots (home, findings, inline edit, approve) copied from Desktop and wired into README.
-- **HARNESS.md fixed**: Removed phantom `tracedModelCall()` references, documented actual OTel impl, noted quick mode skip in CONTEXT checkpoint, added Approval UI callout.
-
-## Tickets Touched
-
-- **FIR-9**: Phase 10 Observability — shipped and merged (PR #12). Fixed review comments: domain cost accumulation, stats SSE try/catch, phase bar division-by-zero guard, phaseDurations null guard, stale submitResult cleared on retry.
-- **FIR-10**: Quick Mode UI toggle — shipped and merged (PR #13). Home page toggle, mode prop threading, ⚡ badge, CONTEXT phase dimming.
-
-## What Was Tried and Abandoned
-
-- **`tracedModelCall()` / coverage signal names** (`files_read/files_in_pr` etc.): Was in the original design doc but never actually implemented. Stripped from HARNESS.md.
-- **Double-submit via `loading` state alone**: Was insufficient — added explicit `submitted` state that replaces buttons with confirmation banner after successful submit.
-
-## Open Questions / Blockers
-
-- Phase 10.1 (alarm SSE wiring) and 10.5 (alarm badges in sidebar) — still not shipped; in Activity feed only.
-- FIR-7 demo video: recorded by ~3:30 PM; not formally checked off in MASTER_CHECKLIST.
-
-## Next Steps (future work, not hackathon-blocked)
-
-1. Review history page (`/history`)
-2. Authentication (Supabase SSR auth)
-3. Automated GitHub webhook trigger
-4. Alarm badges in pipeline sidebar
-5. Additional domain agents (Style, Performance, Conventions)
-
-## Key Files
-
-- `HARNESS.md` — four-pillar design doc (hackathon deliverable); updated this session
-- `README.md` — updated with Screenshots section + accurate feature list
-- `docs/screenshots/` — four demo screenshots (01-home, 02-findings, 03-inline-edit, 04-approve)
-- `src/harness/observability.ts` — OTel tracer, `withSpan()` helper
-- `instrumentation.ts` — Next.js OTel init hook
-- `src/agents/pr-review/coordinator.ts` — stats SSE emit, phase spans, structured log
-- `app/page.tsx` — client component with Quick Mode toggle
-- `app/review/[id]/ReviewShell.tsx` — stats sidebar, submitted state, mode prop
-
----
-
-# Session State — 2026-06-13 12:09
-
-## Context
-
-Gauntlet hackathon (Fired Festival). FIR-1 through FIR-6 are all complete and merged (or on branch ready to merge). FIR-8 is in progress on `ath/FIR-8/task-1`. Due 4:30 PM today.
-
-## Decisions Made
-
-- **In-process review cache** (`src/harness/review-cache.ts`): Module-level `Map<reviewId, PRReview>` with 1-hour TTL bridges the SSE route (where the review runs) and the finalize route (where the user submits decisions). Works on Railway single-instance. Alternative (Supabase-backed checkpoint) deferred — overkill for hackathon.
-- **Finalize route schema uses `action: ACCEPT|REJECT|EDIT`** (matches `FindingDecision` from `approval.ts`), NOT the old `accepted: boolean` stub. Updated accordingly.
-- **`/api/health` route added** for Railway health check ping.
-- **`railway.json` uses DOCKERFILE builder** with `buildArgs` forwarding `NEXT_PUBLIC_*` vars baked at build time. `next.config.ts` already had `output: "standalone"`.
-- **`post_review_comment` calls `octokit.issues.createComment`** (PR-level comment, not inline). Gated by `DRY_RUN=true`. Non-fatal failure on storeReview (logs, doesn't 500).
-
-## Tickets Touched
-
-- **FIR-5**: complete — Next.js web shell, Supabase SSR middleware, stub routes, approval UI
-- **FIR-6**: complete — all agent modules (prompts, context, correctness, security, merge, coordinator, approval), SSE wiring, tests, PR review fixes, CI fixes
-- **FIR-8**: in progress on `ath/FIR-8/task-1` — Dockerfile ✅, railway.json ✅, `/api/health` ✅, review-cache ✅, finalize wired ✅, start route E.1 (persist to Supabase) ⬜
-
-## What Was Tried and Abandoned
-
-- `emit('finding')` during domain agent `.then()` blocks: caused ID mismatch (pre-merge IDs). Moved to after `mergeResults()`.
-- `async check()` without `await` in coordinator checkpoints: ESLint `require-await` error. Fixed by removing `async` + returning `Promise.resolve()`.
-
-## Open Questions / Blockers
-
-- **E.1 (start route Supabase persist)**: Skipped for now — reviewId is only meaningful after review completes; the cache approach is sufficient for demo.
-- **Railway env vars**: Need to be set manually in Railway dashboard — `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LINEAR_API_KEY`.
-- **F.2 (create Railway project)**: User needs to do this manually via Railway dashboard or CLI.
-
-## Next Steps
-
-1. Finish FIR-8: push branch, create PR, merge — then set Railway env vars and verify auto-deploy
-2. Smoke test: `curl /api/health` on Railway URL; POST `/api/review/start` with demo PR URL
-3. **FIR-7**: end-to-end run against `python-adventofcode2020` PR #1, write `HARNESS.md`, record 5-min video
-
-## Key Files
-
-- `src/harness/review-cache.ts` — new: in-process PRReview cache (reviewId TTL Map)
-- `app/api/review/[id]/route.ts` — SSE route: calls `runReview`, caches result, emits `done`
-- `app/api/review/[id]/finalize/route.ts` — fully wired: loads cache, storeReview, optional post_review_comment
-- `app/api/health/route.ts` — new: Railway health check
-- `Dockerfile` — multi-stage Node 22 Alpine, standalone output, non-root user
-- `railway.json` — DOCKERFILE builder, health check path, restart policy
-
----
-
-# Session State — 2026-06-13 10:47
-
-## Context
-
-Gauntlet hackathon (Fired Festival). FIR-1 through FIR-4 are all merged to `main`. Currently on `main`. Next up: FIR-5 (Next.js web shell) → FIR-6 (agents) → FIR-8 (wire + deploy) → FIR-7 (demo polish). Due 4:30 PM today.
-
-## Decisions Made
-
-- **Railway + Supabase (not Vercel)**: deployment target changed from Vercel to existing Railway project. New Railway deployment(s) for this app, existing Supabase instance for auth + memory.
-- **Jest + ts-jest (not Vitest)**: switched testing framework to Jest for consistency with other Andrew projects.
-- **Two-tier CI**: `unit` job (fast, no services) + `integration` job (postgres:16 service). `npm test` excludes integration, `npm run test:integration` runs them via dotenvx. `docker-compose.yml` mirrors CI locally.
-- **ESLint v9 flat config + Prettier**: `eslint.config.js` (CommonJS format to avoid MODULE_TYPELESS_PACKAGE_JSON warning). `__mocks__/**` excluded from ESLint. `.prettierrc` with `prettier-plugin-sql`.
-- **`@octokit/rest` ESM fix**: `__mocks__/@octokit/rest.js` + `moduleNameMapper` in `jest.config.js` — proper CJS stub. No more `require()` hack in production code.
-- **Graceful degradation pattern**: `createOctokit()` returns `null` when `GITHUB_TOKEN` absent (GitHub tools excluded from registry). `createLinearClient()` returns `null` when `LINEAR_API_KEY` absent (ticket tools return error-as-data). Both match same pattern.
-- **Composition root**: `src/harness/context.ts` — `createReviewContext()` is the single factory for CLI and web. `buildRegistry()` spreads all tool factories.
-- **`UNIQUE NULLS NOT DISTINCT`**: Used in `review_checkpoints` for `(review_id, stage, agent_name)` constraint — allows parallel agents to write same stage with different `agent_name`, but enforces uniqueness for null `agent_name`.
-
-## Tickets Touched
-
-- **FIR-1**: merged — scaffold, schema, alarms (25 tests)
-- **FIR-2**: merged — harness core (loop, tools, checkpoints, guardrails, observability)
-- **FIR-3**: merged — memory layer (MemoryStore, LocalMemoryStore, SupabaseMemoryStore, Supabase migration, Postgres integration tests)
-- **FIR-4**: merged — tool implementations (github.ts, memory.ts, tickets.ts), buildRegistry(), ESM fix, linting/formatting
-
-## What Was Tried and Abandoned
-
-- `transformIgnorePatterns` to handle `@octokit/rest` ESM: didn't reach transitive `@octokit/core` imports. Replaced with `moduleNameMapper` CJS stub.
-- `jest.mock('@octokit/rest')` in test files: worked but was noisy boilerplate. Replaced with global `moduleNameMapper`.
-- `require()` lazy-load in `buildRegistry()` to avoid ESM at import time: worked but blocked TypeScript static analysis. Replaced with proper stub + static import.
-- `DRY_RUN` as module-level constant: made the env var unobservable after module load. Fixed to read `process.env.DRY_RUN` at call time.
-- `testPathIgnorePatterns` in `jest.config.js` for integration tests: conflicted with `--testPathPattern` CLI flag. Moved to `npm test` script as `--testPathIgnorePatterns=tests/integration`.
-
-## Open Questions / Blockers
-
-- `search_codebase` tool (code index / vector search) — skipped in FIR-4; `MemoryStore.searchCode()` exists but not exposed as a tool. Intentional MVP skip.
-- `post_review_comment` posts to `issues.createComment` (PR-level), not `pulls.createReviewComment` (line-level inline). Sufficient for demo?
-- GitHub token scope needed for `post_review_comment` — confirm before wiring finalize route.
-- FIR-5 needs: Supabase SSR middleware, `@supabase/ssr`, Next.js 15 App Router.
-
-## Next Steps
-
-1. **FIR-5**: Next.js web shell — `next.config.ts` (`output: "standalone"`), `app/layout.tsx`, `app/page.tsx`, Supabase SSR middleware, stub API routes (`/api/review/start`, `/api/review/[id]` SSE, `/api/review/[id]/finalize`), approval UI shell
-2. **FIR-6**: Agents — prompts, context-agent, correctness-agent, security-agent, merge, coordinator, approval state machine
-3. **FIR-8**: Wire agents into routes + Railway Dockerfile + env vars + smoke test
-4. **FIR-7**: End-to-end demo run, HARNESS.md, 5-min video
-
-## Key Files
-
-- `MASTER_CHECKLIST.md` — primary task tracker (FIR-1/2/3/4 ✅, FIR-5/6/8/7 pending)
-- `ARCHITECTURE.md` — full design spec (~830 lines, authoritative)
-- `src/harness/context.ts` — composition root; `createReviewContext()` + `buildRegistry()`
-- `src/tools/github.ts`, `src/tools/memory.ts`, `src/tools/tickets.ts` — tool factories
-- `src/harness/loop.ts` — agent loop (maxTurns, maxTokens, timeoutMs hard stops)
-- `src/harness/tools.ts` — `dispatch()` + `toToolDefinitions()`
-- `src/memory/store.ts` — `MemoryStore` interface
-- `supabase/migrations/20260613_memory_tables.sql` — Supabase schema
-- `tests/integration/db.test.ts` — Postgres integration tests (need Docker running: `docker compose up -d`)
-- `.env` — `TEST_POSTGRES_URL` for local integration tests (gitignored)
-- `__mocks__/@octokit/rest.js` — CJS stub for ESM Octokit in Jest
-
----
-
-# Session State — 2026-06-13 01:01
-
-## Context
-
-Gauntlet hackathon (Fired Festival). Architecture/design phase complete. Submitted one-pager PDF. 8am start tomorrow to build the actual implementation.
-
-## Decisions Made
-
-- **Web-first delivery**: Next.js on Vercel is the primary interface. CLI is a secondary alternative using the same harness core.
-- **Multi-agent fan-out**: Context Agent (full loop, tool calls) → 5 parallel domain agents (Style, Conventions, Correctness, Security, Performance) as single-shot structured output → Coordinator merges.
-- **Memory MVP scope**: Memories + Review History ship in v1 (simple Supabase tables). Code Index deferred to v2 — needs background indexer job.
-- **SQLite is zero-config fallback** for CLI, not the CLI's identity. Both CLI and web use `MEMORY_PROVIDER` env var.
-- **Approval UI**: Web = checkbox finding cards (nits unchecked by default), inline edit, submit. CLI = sequential [A]ccept/[R]eject/[E]dit with nit batch at end.
-- **`--quick` mode**: Skips Context Agent, Correctness + Security only, BLOCKING findings, ~30 sec.
-- **Guardrails**: GitHub/ticket read-only, post_review_comment gated behind approval, file citation check, secret scan, scope-creep budget.
-- **Observability signals**: Coverage (files_read/files_in_pr, lines_read, external_context_calls), Cost ($/review, context vs diff split), Quality (acceptance rate, edit rate, ticket_resolved — free from approval loop), Health (turns_used, tool_errors).
-
-## Key Files
-
-- `ARCHITECTURE.md` — full design, ~724 lines
-- `ARCHITECTURE_ONE_PAGER.md` — submission one-pager
-- `docs/multi-agent-design.md` — schema contracts (Finding, EnrichedContext, DomainResult, PRReview), execution modes, merge rules
-- `docs/approval-ui.md` — web + CLI approval UX spec, FindingDecision/ReviewSubmission schema
-- `docs/brainstorms/2026-06-12-pr-review-harness-requirements.md` — requirements doc
-- `generated/ARCHITECTURE_ONE_PAGER.html` — styled HTML (moved to docs/ for git checkin)
-- `README.md` — created tonight, one-pager content + getting started + env vars
-
-## Next Steps (8am)
-
-1. Scaffold `src/harness/` — loop.ts, tools.ts, guardrails.ts, models.ts (ModelClient interface + Anthropic adapter)
-2. Scaffold `src/memory/` — MemoryStore interface, SupabaseMemoryStore (reviews + memories tables only)
-3. Build Context Agent + Correctness domain agent as first working vertical slice
-4. Next.js shell — /api/review/start route, bare approval UI page
-5. Wire Supabase: two tables — `memories`, `review_history`
-
-## Demo Target Repo
-
-- **`github.com/atharrison/python-adventofcode2020`** — Andrew's public repo, now on `main` (was `master`, fast-forwarded tonight)
-- PR open: [#1](https://github.com/atharrison/python-adventofcode2020/pull/1) `ath/DAY-013/task-1` → `main` (3 commits)
-  - `day13/schedule.py` — `BusSchedule` helper (mirrors bag_graph.py/interpreter.py pattern)
-  - `day13/day13.py` — delegates to `BusSchedule`; sieve/CRT in Part 2
-  - `main.py` — intentionally left with "edit 3 places per new day" smell for agent to find
-  - Review surface: no type hints/docstrings, debug prints, magic `'x'` string, undocumented coprime assumption, duplicate list filtering across `get_active_buses` vs `get_constraints`
-  - Sample answers verified: Part 1 = 295, Part 2 = 1068781; real input verified locally (not committed)
-  - `day13input.txt` gitignored; real input on disk at that path
-- `gh` CLI installed and auth'd
-
-## Open Questions
-
-- Will we have time to build the full 5-domain agent set, or ship Correctness + Security for the demo?
-- GitHub token scope needed for `post_review_comment` — confirm before wiring the finalize route
-- Do we need auth on the Vercel app for the hackathon demo, or is it open? **→ No auth. Open app for demo.**
-
-## Tech Stack Confirmed
-
-- TypeScript, Node 20, ESM
-- Next.js 14 App Router (Vercel)
-- Supabase + pgvector
-- Zod v3 for all schemas
-- Anthropic Claude (default LLM, pluggable via ModelClient)
-- Linear (MVP ticket tracker, pluggable via TicketClient)
-- GitHub via @octokit/rest
-- OpenTelemetry
-- Vitest
+- `app/api/auth/callback/route.ts` — origin resolution fix (x-forwarded-\* headers)
+- `.env.example` — now documents `NEXT_PUBLIC_SITE_URL`
+- `tests/api.queue.test.ts` — GET /api/queue/repos `beforeEach` baseline fix

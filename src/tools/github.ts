@@ -29,7 +29,7 @@ const PostReviewCommentSchema = z.object({
   body: z.string(),
 })
 
-const FILE_CONTENT_MAX_BYTES = 8 * 1024 // 8 KB per file — guardrail
+const FILE_CONTENT_MAX_BYTES = 32 * 1024 // 32 KB per file — covers typical test files
 
 // ── Tool factory ──────────────────────────────────────────────────────────────
 
@@ -95,7 +95,12 @@ export function createGithubTools(
           status: f.status,
           additions: f.additions,
           deletions: f.deletions,
-          patch: f.patch ? f.patch.slice(0, FILE_CONTENT_MAX_BYTES) : undefined,
+          patch: f.patch
+            ? f.patch.length > FILE_CONTENT_MAX_BYTES
+              ? f.patch.slice(0, FILE_CONTENT_MAX_BYTES) +
+                `\n// [patch truncated — ${f.patch.length - FILE_CONTENT_MAX_BYTES} bytes omitted]`
+              : f.patch
+            : undefined,
           blobUrl: f.blob_url,
         }))
       },

@@ -205,9 +205,15 @@ export async function POST(
       }
     }
 
-    await setReviewSubmission(reviewId, approvalSubmission).catch(err =>
+    try {
+      await setReviewSubmission(reviewId, approvalSubmission)
+    } catch (err) {
       console.error('[finalize] setReviewSubmission failed:', err)
-    )
+      return NextResponse.json(
+        { error: 'Failed to persist submission — please retry.' },
+        { status: 500 }
+      )
+    }
     await markTrackedPrReviewed(prUrlParts, reviewId)
     return NextResponse.json({
       reviewId,
@@ -293,9 +299,15 @@ export async function POST(
     }
   }
 
-  await setReviewSubmission(reviewId, submission).catch(err =>
+  try {
+    await setReviewSubmission(reviewId, submission)
+  } catch (err) {
     console.error('[finalize] setReviewSubmission failed:', err)
-  )
+    return NextResponse.json(
+      { error: 'Failed to persist submission — please retry.' },
+      { status: 500 }
+    )
+  }
   await markTrackedPrReviewed(prUrlParts, reviewId)
   return NextResponse.json({
     reviewId,

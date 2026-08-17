@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
   const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https'
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ??
-    (forwardedHost ? `${forwardedProto}://${forwardedHost}` : new URL(request.url).origin)
+    (forwardedHost
+      ? `${forwardedProto}://${forwardedHost}`
+      : new URL(request.url).origin)
   const code = searchParams.get('code')
   // Validate `next` is a relative path to prevent open-redirect attacks.
   // `new URL(absolute, origin)` would follow the absolute URL; we only allow

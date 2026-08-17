@@ -29,7 +29,7 @@ describe('createGithubTools', () => {
   })
 
   describe('fetch_pr_files', () => {
-    it('returns mapped file list with patch truncated to 8 KB', async () => {
+    it('returns mapped file list with patch within limit returned as-is', async () => {
       const octokit = mockOctokit()
       const bigPatch = 'x'.repeat(10_000)
       ;(octokit.pulls.listFiles as jest.Mock).mockResolvedValue({
@@ -55,7 +55,7 @@ describe('createGithubTools', () => {
       const files = result as Array<{ filename: string; patch?: string }>
       expect(files).toHaveLength(1)
       expect(files[0].filename).toBe('src/main.py')
-      expect(files[0].patch!.length).toBe(8 * 1024) // truncated at 8 KB
+      expect(files[0].patch).toBe(bigPatch) // 10 KB is under the 32 KB limit — no truncation
     })
   })
 
@@ -94,6 +94,81 @@ describe('createGithubTools', () => {
         body: 'test comment',
       })
       expect(octokit.issues.createComment).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('fetch_pr_files — patch truncation', () => {
+    it('returns patch unchanged when it is within the 32 KB limit', async () => {
+      const shortPatch = 'a'.repeat(100)
+      const octokit = mockOctokit()
+      ;(octokit.pulls.listFiles as jest.Mock).mockResolvedValue({
+        data: [
+          {
+            filename: 'src/foo.ts',
+            status: 'modified',
+            additions: 1,
+            deletions: 0,
+            patch: shortPatch,
+            blob_url: '',
+          },
+        ],
+      })
+      const tools = createGithubTools(octokit)
+      const result = (await tools.fetch_pr_files.fn({
+        owner: 'org',
+        repo: 'repo',
+        pull_number: 1,
+      })) as Array<{ patch?: string }>
+      expect(result[0].patch).toBe(shortPatch)
+    })
+
+    it('slices patch and appends sentinel when patch exceeds 32 KB', async () => {
+      const longPatch = 'b'.repeat(33 * 1024) // 33 KB — just over the limit
+      const octokit = mockOctokit()
+      ;(octokit.pulls.listFiles as jest.Mock).mockResolvedValue({
+        data: [
+          {
+            filename: 'tests/big.test.ts',
+            status: 'added',
+            additions: 900,
+            deletions: 0,
+            patch: longPatch,
+            blob_url: '',
+          },
+        ],
+      })
+      const tools = createGithubTools(octokit)
+      const result = (await tools.fetch_pr_files.fn({
+        owner: 'org',
+        repo: 'repo',
+        pull_number: 1,
+      })) as Array<{ patch?: string }>
+      expect(result[0].patch).toContain('[patch truncated')
+      expect(result[0].patch).toContain('bytes omitted]')
+      expect(result[0].patch!.length).toBeLessThan(longPatch.length)
+    })
+
+    it('returns undefined patch when GitHub provides no patch', async () => {
+      const octokit = mockOctokit()
+      ;(octokit.pulls.listFiles as jest.Mock).mockResolvedValue({
+        data: [
+          {
+            filename: 'binary.png',
+            status: 'added',
+            additions: 0,
+            deletions: 0,
+            patch: undefined,
+            blob_url: '',
+          },
+        ],
+      })
+      const tools = createGithubTools(octokit)
+      const result = (await tools.fetch_pr_files.fn({
+        owner: 'org',
+        repo: 'repo',
+        pull_number: 1,
+      })) as Array<{ patch?: string }>
+      expect(result[0].patch).toBeUndefined()
     })
   })
 
