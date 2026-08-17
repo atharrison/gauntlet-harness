@@ -35,28 +35,24 @@ const FinalizeBody = z.object({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Best-effort: mark the corresponding tracked_pr as REVIEWED and record which
- * review produced it. Fire-and-forget — never throws.
+ * Mark the corresponding tracked_pr as REVIEWED and record which review
+ * produced it. Awaited before the response is sent so the transition is
+ * guaranteed to complete (important in serverless environments).
  */
-function markTrackedPrReviewed(
+async function markTrackedPrReviewed(
   prUrlParts: RegExpMatchArray | null,
   reviewId: string
-): void {
+): Promise<void> {
   if (!prUrlParts) return
   const service = createSupabaseServiceRoleClient()
-  service
+  const { error } = await service
     .from('tracked_prs')
     .update({ status: 'REVIEWED', last_review_id: reviewId })
     .eq('owner', prUrlParts[1])
     .eq('repo', prUrlParts[2])
     .eq('pr_number', Number(prUrlParts[3]))
-    .then(({ error }) => {
-      if (error)
-        console.error(
-          '[finalize] tracked_prs REVIEWED transition failed:',
-          error
-        )
-    })
+  if (error)
+    console.error('[finalize] tracked_prs REVIEWED transition failed:', error)
 }
 
 // ── POST /api/review/[id]/finalize ────────────────────────────────────────────
@@ -212,7 +208,7 @@ export async function POST(
     await setReviewSubmission(reviewId, approvalSubmission).catch(err =>
       console.error('[finalize] setReviewSubmission failed:', err)
     )
-    markTrackedPrReviewed(prUrlParts, reviewId)
+    await markTrackedPrReviewed(prUrlParts, reviewId)
     return NextResponse.json({
       reviewId,
       status: 'approved',
@@ -300,7 +296,7 @@ export async function POST(
   await setReviewSubmission(reviewId, submission).catch(err =>
     console.error('[finalize] setReviewSubmission failed:', err)
   )
-  markTrackedPrReviewed(prUrlParts, reviewId)
+  await markTrackedPrReviewed(prUrlParts, reviewId)
   return NextResponse.json({
     reviewId,
     status: 'finalized',

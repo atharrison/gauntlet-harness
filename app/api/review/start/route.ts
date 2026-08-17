@@ -53,24 +53,18 @@ export async function POST(request: NextRequest) {
   const reviewId = uuidv4()
 
   // Best-effort: transition tracked_pr to IN_REVIEW if it exists in the queue.
-  // Fire-and-forget — never block the response on this.
   const prParsed = parsePrUrl(parsed.data.prUrl)
   if (prParsed) {
     const service = createSupabaseServiceRoleClient()
-    service
+    const { error: transitionError } = await service
       .from('tracked_prs')
       .update({ status: 'IN_REVIEW' })
       .eq('owner', prParsed.owner)
       .eq('repo', prParsed.repo)
       .eq('pr_number', prParsed.pr_number)
       .eq('status', 'OPEN')
-      .then(({ error }) => {
-        if (error)
-          console.error(
-            '[start] tracked_prs IN_REVIEW transition failed:',
-            error
-          )
-      })
+    if (transitionError)
+      console.error('[start] tracked_prs IN_REVIEW transition failed:', transitionError)
   }
 
   return NextResponse.json(
