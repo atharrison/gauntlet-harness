@@ -308,6 +308,26 @@ describe('PATCH /api/queue/[id]', () => {
     const body = await res.json()
     expect(body.pr.status).toBe('REVIEWED')
   })
+
+  it('returns 404 when the row does not exist (PGRST116)', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    mockServiceClient.current = makeChain({
+      data: null,
+      error: { code: 'PGRST116', message: 'No rows found' },
+    })
+    const { PATCH } = await import('../app/api/queue/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/nonexistent', {
+      method: 'PATCH',
+      body: { status: 'REVIEWED' },
+    })
+    const res = await PATCH(req, {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    expect(res.status).toBe(404)
+  })
 })
 
 // ── DELETE /api/queue/[id] ────────────────────────────────────────────────────

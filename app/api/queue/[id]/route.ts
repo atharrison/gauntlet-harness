@@ -49,14 +49,14 @@ export async function PATCH(
     .single()
 
   if (error) {
+    if (error.code === 'PGRST116') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
     console.error('[PATCH /api/queue/[id]]', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
-  }
-  if (!data) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   return NextResponse.json({ pr: data })
 }
