@@ -75,10 +75,17 @@ export async function DELETE(
   const { id } = await params
 
   const service = createSupabaseServiceRoleClient()
-  const { error } = await service.from('tracked_prs').delete().eq('id', id)
+  const { data, error } = await service
+    .from('tracked_prs')
+    .delete()
+    .eq('id', id)
+    .select()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   return new NextResponse(null, { status: 204 })
 }

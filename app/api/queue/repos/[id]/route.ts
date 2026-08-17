@@ -1,9 +1,14 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '../../../../../src/lib/supabase/server'
+import {
+  createSupabaseServerClient,
+  createSupabaseServiceRoleClient,
+} from '../../../../../src/lib/supabase/server'
 
 /**
  * DELETE /api/queue/repos/[id]
  * Removes a configured repo.
+ * Uses the service role client for consistency with other write operations
+ * and to avoid any RLS edge cases on configured_repos.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -18,13 +23,18 @@ export async function DELETE(
 
   const { id } = await params
 
-  const { error } = await supabase
+  const service = createSupabaseServiceRoleClient()
+  const { data, error } = await service
     .from('configured_repos')
     .delete()
     .eq('id', id)
+    .select()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   return new NextResponse(null, { status: 204 })
 }

@@ -310,6 +310,114 @@ describe('PATCH /api/queue/[id]', () => {
   })
 })
 
+// ── DELETE /api/queue/[id] ────────────────────────────────────────────────────
+
+describe('DELETE /api/queue/[id]', () => {
+  beforeEach(() => {
+    jest.resetModules()
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockAnonClient.current = makeSupabaseClient(null, {
+      data: null,
+      error: null,
+    })
+    const { DELETE } = await import('../app/api/queue/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/pr-1', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, { params: Promise.resolve({ id: 'pr-1' }) })
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 204 on successful delete', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    mockServiceClient.current = makeChain({
+      data: [{ id: 'pr-1' }],
+      error: null,
+    })
+    const { DELETE } = await import('../app/api/queue/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/pr-1', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, { params: Promise.resolve({ id: 'pr-1' }) })
+    expect(res.status).toBe(204)
+  })
+
+  it('returns 404 when the row does not exist', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    mockServiceClient.current = makeChain({ data: [], error: null })
+    const { DELETE } = await import('../app/api/queue/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/nonexistent', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    expect(res.status).toBe(404)
+  })
+})
+
+// ── DELETE /api/queue/repos/[id] ─────────────────────────────────────────────
+
+describe('DELETE /api/queue/repos/[id]', () => {
+  beforeEach(() => {
+    jest.resetModules()
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockAnonClient.current = makeSupabaseClient(null, {
+      data: null,
+      error: null,
+    })
+    const { DELETE } = await import('../app/api/queue/repos/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/repos/r-1', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, { params: Promise.resolve({ id: 'r-1' }) })
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 204 on successful delete', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    mockServiceClient.current = makeChain({
+      data: [{ id: 'r-1' }],
+      error: null,
+    })
+    const { DELETE } = await import('../app/api/queue/repos/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/repos/r-1', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, { params: Promise.resolve({ id: 'r-1' }) })
+    expect(res.status).toBe(204)
+  })
+
+  it('returns 404 when the repo does not exist', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    mockServiceClient.current = makeChain({ data: [], error: null })
+    const { DELETE } = await import('../app/api/queue/repos/[id]/route')
+    const req = makeRequest('http://localhost/api/queue/repos/nonexistent', {
+      method: 'DELETE',
+    })
+    const res = await DELETE(req, {
+      params: Promise.resolve({ id: 'nonexistent' }),
+    })
+    expect(res.status).toBe(404)
+  })
+})
+
 // ── POST /api/queue/repos ──────────────────────────────────────────────────────
 
 describe('POST /api/queue/repos', () => {
