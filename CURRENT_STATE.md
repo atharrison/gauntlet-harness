@@ -1,5 +1,55 @@
 > **Starting a new session?** Run `/current-state` to orient before starting work.
 
+# Session State — 2026-08-16 23:23
+
+## Context
+
+Gauntlet Harness — AI-powered PR review tool. Sprint 1 MVP is fully merged and live in production. This session continued from the previous one, shipping ATH-22 and ATH-28 via PR #19 (merged).
+
+## What Was Done This Session
+
+- **ATH-27** (coverage cleanup) merged via PR #18 — responded to review, fixed `mockAnonClient.current` baseline reset
+- **Production go-live** — fixed OAuth redirect loop (Supabase provider not enabled, Site URL pointed to localhost, `request.url` returning `0.0.0.0:8080`); added `NEXT_PUBLIC_SITE_URL` env var + `x-forwarded-host` header fallback in auth callback
+- **ATH-22** merged via PR #19 — env var startup validation (`src/harness/env.ts` + `instrumentation.ts`), `setReviewSubmission` 500 hardening, SSE error sanitization; 224 tests / 24 suites
+- **ATH-28** merged in same PR #19 — `fetch_pr_files` patch limit 8 KB → 32 KB + sentinel on truncation; eliminates false "placeholder code" review findings
+- Created **ATH-29** — review comment preview + edit before posting to GitHub
+- Created **ATH-28** — diff truncation bug (now Done)
+
+## Decisions Made
+
+- **`process.exit(1)` over `throw`** in `validateEnv()`: throwing lets Next.js wrap the error with its own noisy error block; `process.exit` gives clean output
+- **32 KB patch limit** (up from 8 KB): covers typical test files without hitting model context limits; sentinel appended on overflow so agents know content was cut
+- **ATH-28 bundled into PR #19**: small and directly related to review quality; no reason to make it a separate PR
+- **Concurrent pipeline race (INSERT ON CONFLICT)**: explicitly deferred — not in ATH-22 scope, no ticket yet
+
+## Tickets Touched
+
+- **ATH-22**: Done ✅ (merged PR #19)
+- **ATH-27**: Done ✅ (merged PR #18, earlier in session)
+- **ATH-28**: Done ✅ (shipped in PR #19)
+- **ATH-29**: Created — review comment preview + edit before posting to GitHub
+
+## Open Questions
+
+- Review harness still sees two consecutive "REQUEST_CHANGES" on PR #19 due to diff truncation. Now that ATH-28 is merged, next PR review should get complete diffs. Worth smoke-testing on the next PR.
+- Concurrent pipeline race condition still unguarded — worth a ticket before adding more traffic.
+
+## Next Steps
+
+1. Smoke-test a real end-to-end review in production (PRs should now get full diffs)
+2. Pick next feature ticket — candidates: ATH-16 (GitHub webhook), ATH-18 (wire search_past_reviews), ATH-19 (review history page), ATH-29 (comment preview/edit)
+3. File concurrent pipeline race ticket before it becomes a real incident
+
+## Key Files
+
+- `src/harness/env.ts` — new startup validation module
+- `src/tools/github.ts` — patch limit now 32 KB + sentinel
+- `app/api/auth/callback/route.ts` — `x-forwarded-host` origin fix + `NEXT_PUBLIC_SITE_URL` override
+- `app/api/review/[id]/finalize/route.ts` — `setReviewSubmission` 500 hardening (both paths)
+- `app/api/review/[id]/route.ts` — SSE error sanitization
+
+---
+
 # Session State — 2026-08-16 22:15
 
 ## Context
