@@ -11,7 +11,17 @@ import { GH_TOKEN_COOKIE } from '../../../../src/lib/supabase/server'
  * redirects to the originally requested page (or / by default).
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+
+  // Railway (and other reverse-proxy hosts) bind the app to an internal address
+  // (e.g. 0.0.0.0:8080) and forward the real public hostname via headers.
+  // Prefer NEXT_PUBLIC_SITE_URL when set, then x-forwarded-* headers, then
+  // fall back to the request origin (works fine for local dev).
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https'
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ??
+    (forwardedHost ? `${forwardedProto}://${forwardedHost}` : new URL(request.url).origin)
   const code = searchParams.get('code')
   // Validate `next` is a relative path to prevent open-redirect attacks.
   // `new URL(absolute, origin)` would follow the absolute URL; we only allow
