@@ -7,6 +7,8 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { validateEnv } = await import('./src/harness/env')
+    validateEnv()
     const { initTracer } = await import('./src/harness/observability')
     initTracer()
   }

@@ -91,7 +91,7 @@ export async function GET(
 
       if (existing?.status === 'ERROR') {
         send('error', {
-          error: existing.error_message ?? 'Review failed previously.',
+          error: 'Review failed. Check server logs for details.',
         })
         send('done', { reviewId })
         controller.close()
@@ -132,7 +132,9 @@ export async function GET(
       } catch (err) {
         console.error(`[review/${reviewId}] runReview failed:`, err)
         await failReview(reviewId, String(err)).catch(() => {})
-        send('error', { error: String(err) })
+        send('error', {
+          error: 'Review pipeline failed. Check server logs for details.',
+        })
         send('done', { reviewId })
       } finally {
         controller.close()
