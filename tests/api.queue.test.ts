@@ -438,6 +438,47 @@ describe('DELETE /api/queue/repos/[id]', () => {
   })
 })
 
+// ── GET /api/queue/repos ───────────────────────────────────────────────────────
+
+describe('GET /api/queue/repos', () => {
+  beforeEach(() => {
+    jest.resetModules()
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockAnonClient.current = makeSupabaseClient(null, {
+      data: null,
+      error: null,
+    })
+    const { GET } = await import('../app/api/queue/repos/route')
+    const res = await GET()
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 200 with repos list on success', async () => {
+    const fakeRepos = [{ id: 'r-1', owner: 'acme', name: 'api' }]
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: fakeRepos,
+      error: null,
+    })
+    const { GET } = await import('../app/api/queue/repos/route')
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.repos).toEqual(fakeRepos)
+  })
+
+  it('returns 500 on DB error', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: { message: 'DB failure' },
+    })
+    const { GET } = await import('../app/api/queue/repos/route')
+    const res = await GET()
+    expect(res.status).toBe(500)
+  })
+})
+
 // ── POST /api/queue/repos ──────────────────────────────────────────────────────
 
 describe('POST /api/queue/repos', () => {
@@ -519,5 +560,34 @@ describe('POST /api/queue/repos', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toMatch(/already configured/)
+  })
+
+  it('returns 400 for invalid JSON body', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: null,
+    })
+    const { POST } = await import('../app/api/queue/repos/route')
+    const req = new Request('http://localhost/api/queue/repos', {
+      method: 'POST',
+      body: 'not-json',
+      headers: { 'Content-Type': 'text/plain' },
+    }) as unknown as import('next/server').NextRequest
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 500 on unexpected DB error during insert', async () => {
+    mockAnonClient.current = makeSupabaseClient(MOCK_USER, {
+      data: null,
+      error: { code: '99999', message: 'unexpected' },
+    })
+    const { POST } = await import('../app/api/queue/repos/route')
+    const req = makeRequest('http://localhost/api/queue/repos', {
+      method: 'POST',
+      body: { owner: 'acme', name: 'api' },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(500)
   })
 })

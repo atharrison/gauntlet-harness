@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
       .eq('pr_number', prParsed.pr_number)
       .eq('status', 'OPEN')
     if (transitionError)
-      console.error('[start] tracked_prs IN_REVIEW transition failed:', transitionError)
+      console.error(
+        '[start] tracked_prs IN_REVIEW transition failed:',
+        transitionError
+      )
   }
 
   return NextResponse.json(
