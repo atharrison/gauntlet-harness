@@ -49,7 +49,11 @@ export async function PATCH(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[PATCH /api/queue/[id]]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   if (!data) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -82,7 +86,11 @@ export async function DELETE(
     .select()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[DELETE /api/queue/[id]]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   if (!data || data.length === 0) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

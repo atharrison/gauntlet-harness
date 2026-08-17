@@ -11,7 +11,10 @@ import {
   buildSubmission,
 } from '../../../../../src/agents/pr-review/approval'
 import { createOctokit } from '../../../../../src/tools/github'
-import { getGitHubToken } from '../../../../../src/lib/supabase/server'
+import {
+  getGitHubToken,
+  createSupabaseServiceRoleClient,
+} from '../../../../../src/lib/supabase/server'
 import type { FindingDecision } from '../../../../../src/agents/pr-review/schema'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -28,6 +31,33 @@ const FinalizeBody = z.object({
   postComment: z.boolean().default(false),
   approve: z.boolean().default(false),
 })
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Best-effort: mark the corresponding tracked_pr as REVIEWED and record which
+ * review produced it. Fire-and-forget — never throws.
+ */
+function markTrackedPrReviewed(
+  prUrlParts: RegExpMatchArray | null,
+  reviewId: string
+): void {
+  if (!prUrlParts) return
+  const service = createSupabaseServiceRoleClient()
+  service
+    .from('tracked_prs')
+    .update({ status: 'REVIEWED', last_review_id: reviewId })
+    .eq('owner', prUrlParts[1])
+    .eq('repo', prUrlParts[2])
+    .eq('pr_number', Number(prUrlParts[3]))
+    .then(({ error }) => {
+      if (error)
+        console.error(
+          '[finalize] tracked_prs REVIEWED transition failed:',
+          error
+        )
+    })
+}
 
 // ── POST /api/review/[id]/finalize ────────────────────────────────────────────
 
@@ -182,6 +212,7 @@ export async function POST(
     await setReviewSubmission(reviewId, approvalSubmission).catch(err =>
       console.error('[finalize] setReviewSubmission failed:', err)
     )
+    markTrackedPrReviewed(prUrlParts, reviewId)
     return NextResponse.json({
       reviewId,
       status: 'approved',
@@ -269,6 +300,7 @@ export async function POST(
   await setReviewSubmission(reviewId, submission).catch(err =>
     console.error('[finalize] setReviewSubmission failed:', err)
   )
+  markTrackedPrReviewed(prUrlParts, reviewId)
   return NextResponse.json({
     reviewId,
     status: 'finalized',

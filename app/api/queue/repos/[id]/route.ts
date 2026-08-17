@@ -31,7 +31,11 @@ export async function DELETE(
     .select()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[DELETE /api/queue/repos/[id]]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   if (!data || data.length === 0) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
+import { parsePrUrl } from '../../../src/lib/queue'
+import { createSupabaseServiceRoleClient } from '../../../src/lib/supabase/server'
 
 const StartReviewBody = z.object({
   prUrl: z.string().url('prUrl must be a valid GitHub PR URL'),
@@ -49,6 +51,27 @@ export async function POST(request: NextRequest) {
   }
 
   const reviewId = uuidv4()
+
+  // Best-effort: transition tracked_pr to IN_REVIEW if it exists in the queue.
+  // Fire-and-forget — never block the response on this.
+  const prParsed = parsePrUrl(parsed.data.prUrl)
+  if (prParsed) {
+    const service = createSupabaseServiceRoleClient()
+    service
+      .from('tracked_prs')
+      .update({ status: 'IN_REVIEW' })
+      .eq('owner', prParsed.owner)
+      .eq('repo', prParsed.repo)
+      .eq('pr_number', prParsed.pr_number)
+      .eq('status', 'OPEN')
+      .then(({ error }) => {
+        if (error)
+          console.error(
+            '[start] tracked_prs IN_REVIEW transition failed:',
+            error
+          )
+      })
+  }
 
   return NextResponse.json(
     { reviewId, prUrl: parsed.data.prUrl, mode: parsed.data.mode },

@@ -21,7 +21,11 @@ export async function GET() {
     .order('name', { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[GET /api/queue/repos]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   return NextResponse.json({ repos: data })
 }
@@ -69,7 +73,11 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[POST /api/queue/repos]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   return NextResponse.json({ repo: data }, { status: 201 })
 }

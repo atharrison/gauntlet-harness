@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[GET /api/queue]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   return NextResponse.json({ prs: data })
 }
@@ -124,7 +128,11 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[POST /api/queue]', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
   return NextResponse.json({ pr: data }, { status: 201 })
 }
