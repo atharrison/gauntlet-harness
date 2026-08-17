@@ -71,6 +71,16 @@ function formatDate(iso: string | null): string {
   })
 }
 
+type StatusFilter = 'ALL' | 'OPEN' | 'IN_REVIEW' | 'REVIEWED' | 'CLOSED'
+
+const FILTER_TABS: { value: StatusFilter; label: string }[] = [
+  { value: 'ALL', label: 'All' },
+  { value: 'OPEN', label: 'Open' },
+  { value: 'IN_REVIEW', label: 'In Review' },
+  { value: 'REVIEWED', label: 'Reviewed' },
+  { value: 'CLOSED', label: 'Closed' },
+]
+
 export default function QueueDisplay({
   initialPrs,
 }: {
@@ -79,6 +89,7 @@ export default function QueueDisplay({
 }) {
   const router = useRouter()
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
 
   async function handleRemove(pr: TrackedPr) {
     if (
@@ -94,9 +105,48 @@ export default function QueueDisplay({
     }
   }
 
-  const groups = groupByRepo(initialPrs)
+  const filteredPrs =
+    statusFilter === 'ALL'
+      ? initialPrs
+      : initialPrs.filter(pr => pr.status === statusFilter)
 
-  if (groups.length === 0) {
+  const groups = groupByRepo(filteredPrs)
+
+  const filterBar = (
+    <div className="flex items-center gap-1 rounded-lg border border-gray-800 bg-gray-900 p-1">
+      {FILTER_TABS.map(tab => {
+        const count =
+          tab.value === 'ALL'
+            ? initialPrs.length
+            : initialPrs.filter(p => p.status === tab.value).length
+        const active = statusFilter === tab.value
+        return (
+          <button
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
+            className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+              active
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {tab.label}
+            {count > 0 && (
+              <span
+                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
+                  active ? 'bg-gray-600 text-gray-200' : 'text-gray-600'
+                }`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (initialPrs.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-800 py-16 text-center">
         <p className="text-gray-500">No PRs tracked yet.</p>
@@ -110,6 +160,12 @@ export default function QueueDisplay({
 
   return (
     <div className="space-y-6">
+      {filterBar}
+      {groups.length === 0 && (
+        <p className="py-8 text-center text-sm text-gray-500">
+          No {statusFilter.toLowerCase().replace('_', ' ')} PRs.
+        </p>
+      )}
       {groups.map(group => (
         <section key={group.key}>
           <div className="mb-2 flex items-center gap-2">

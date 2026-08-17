@@ -65,11 +65,9 @@ jest.mock('../src/lib/supabase/server', () => ({
   createSupabaseServerClient: jest
     .fn()
     .mockImplementation(() => mockAnonClient.current),
-  createSupabaseServiceRoleClient: jest
-    .fn()
-    .mockImplementation(() => ({
-      from: jest.fn().mockReturnValue(mockServiceClient.current),
-    })),
+  createSupabaseServiceRoleClient: jest.fn().mockImplementation(() => ({
+    from: jest.fn().mockReturnValue(mockServiceClient.current),
+  })),
   getGitHubToken: jest.fn().mockResolvedValue(null),
   GH_TOKEN_COOKIE: 'gh_provider_token',
 }))
