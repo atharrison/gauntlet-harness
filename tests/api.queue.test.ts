@@ -443,6 +443,10 @@ describe('DELETE /api/queue/repos/[id]', () => {
 describe('GET /api/queue/repos', () => {
   beforeEach(() => {
     jest.resetModules()
+    mockAnonClient.current = makeSupabaseClient(null, {
+      data: null,
+      error: null,
+    })
   })
 
   it('returns 401 when not authenticated', async () => {
