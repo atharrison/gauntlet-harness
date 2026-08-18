@@ -4,12 +4,13 @@
  * Supabase service-role client is fully mocked; no real DB required.
  * Tests cover:
  *   - Non-pull_request event → 204
- *   - Repo not configured → 404
- *   - No webhook_secret on repo → 401 (misconfigured, always required)
+ *   - Missing signature header → 401 (before any DB call)
+ *   - Repo not configured → 401 (same code as bad signature to prevent enumeration)
+ *   - No webhook_secret on repo → 401
  *   - Invalid HMAC → 401
- *   - Missing pull_request field in payload → 400
+ *   - Missing action or pull_request field in payload → 400
  *   - opened / reopened → 200 + upsert
- *   - closed → 200 + update; matched=0 logged for untracked PRs
+ *   - closed → 200 + update (clears updated_since_review); matched=0 logged for untracked PRs
  *   - synchronize → 200 + conditional update
  *   - Unrecognised action → 204
  *   - DB error paths → 500
@@ -152,15 +153,18 @@ describe('POST /api/webhooks/github', () => {
   // ── Invalid JSON ──────────────────────────────────────────────────────────
 
   it('returns 400 for invalid JSON body', async () => {
+    const rawBody = 'not-json'
+    // A valid signature is needed to pass the early header check; parsing fails after.
+    const sig = computeGitHubSignature(rawBody, WEBHOOK_SECRET)
     const req = new NextRequest('http://localhost/api/webhooks/github', {
       method: 'POST',
-      body: 'not-json',
+      body: rawBody,
       headers: {
         'content-type': 'application/json',
         'x-github-event': 'pull_request',
+        'x-hub-signature-256': sig,
       },
     })
-    // No DB call expected since parse fails first
     const res = await POST(req)
     expect(res.status).toBe(400)
   })
@@ -173,12 +177,14 @@ describe('POST /api/webhooks/github', () => {
       number: 42,
       pull_request: {},
     })
+    const sig = computeGitHubSignature(body, WEBHOOK_SECRET)
     const req = new NextRequest('http://localhost/api/webhooks/github', {
       method: 'POST',
       body,
       headers: {
         'content-type': 'application/json',
         'x-github-event': 'pull_request',
+        'x-hub-signature-256': sig,
       },
     })
     const res = await POST(req)
@@ -187,26 +193,9 @@ describe('POST /api/webhooks/github', () => {
     expect(json.error).toMatch(/repository/i)
   })
 
-  // ── Repo not configured ────────────────────────────────────────────────────
+  // ── HMAC validation (early rejection + enumeration prevention) ───────────────
 
-  it('returns 404 when repo is not in configured_repos', async () => {
-    const notFoundChain = makeChain({ data: null, error: { code: 'PGRST116' } })
-    mockServiceFromFn.mockReturnValue(notFoundChain)
-
-    const body = buildPayload('opened')
-    const req = makeRequest(body)
-    const res = await POST(req)
-    expect(res.status).toBe(404)
-    const json = await res.json()
-    expect(json.error).toMatch(/not configured/i)
-  })
-
-  // ── HMAC validation ────────────────────────────────────────────────────────
-
-  it('returns 401 when signature is missing and webhook_secret is set', async () => {
-    const repoChain = makeConfiguredRepo(WEBHOOK_SECRET)
-    mockServiceFromFn.mockReturnValue(repoChain)
-
+  it('returns 401 immediately when signature header is absent — no DB call made', async () => {
     const body = buildPayload('opened')
     const req = new NextRequest('http://localhost/api/webhooks/github', {
       method: 'POST',
@@ -221,6 +210,21 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(401)
     const json = await res.json()
     expect(json.error).toMatch(/signature/i)
+    // Must short-circuit before touching the DB
+    expect(mockServiceFromFn).not.toHaveBeenCalled()
+  })
+
+  // ── Repo not configured ────────────────────────────────────────────────────
+
+  it('returns 401 (not 404) when repo is not in configured_repos — prevents enumeration', async () => {
+    const notFoundChain = makeChain({ data: null, error: { code: 'PGRST116' } })
+    mockServiceFromFn.mockReturnValue(notFoundChain)
+
+    const body = buildPayload('opened')
+    const req = makeRequest(body)
+    const res = await POST(req)
+    // 401 instead of 404 so callers can't distinguish unknown-repo from bad-signature
+    expect(res.status).toBe(401)
   })
 
   it('returns 401 when signature is wrong', async () => {
@@ -246,12 +250,15 @@ describe('POST /api/webhooks/github', () => {
     mockServiceFromFn.mockReturnValueOnce(repoChain)
 
     const body = buildPayload('opened')
+    // Must include a signature header so the early-rejection check passes and
+    // the code reaches the null-secret guard.
     const req = new NextRequest('http://localhost/api/webhooks/github', {
       method: 'POST',
       body,
       headers: {
         'content-type': 'application/json',
         'x-github-event': 'pull_request',
+        'x-hub-signature-256': 'sha256=' + 'a'.repeat(64),
       },
     })
     const res = await POST(req)
@@ -260,7 +267,40 @@ describe('POST /api/webhooks/github', () => {
     expect(json.error).toMatch(/secret not configured/i)
   })
 
-  // ── Missing pull_request field ───────────────────────────────────────────────
+  // ── Missing action / pull_request fields ─────────────────────────────────────
+
+  it('returns 400 when action field is absent from payload', async () => {
+    const repoChain = makeConfiguredRepo()
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
+
+    const rawBody = JSON.stringify({
+      // no action field
+      pull_request: {
+        number: 42,
+        title: 'x',
+        html_url: `https://github.com/${OWNER}/${REPO}/pull/42`,
+        state: 'open',
+        user: { login: 'dev' },
+        created_at: '2026-08-17T00:00:00Z',
+        closed_at: null,
+      },
+      repository: { name: REPO, owner: { login: OWNER } },
+    })
+    const sig = computeGitHubSignature(rawBody, WEBHOOK_SECRET)
+    const req = new NextRequest('http://localhost/api/webhooks/github', {
+      method: 'POST',
+      body: rawBody,
+      headers: {
+        'content-type': 'application/json',
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': sig,
+      },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/action/i)
+  })
 
   it('returns 400 when pull_request field is absent from a well-formed payload', async () => {
     const repoChain = makeConfiguredRepo()
@@ -377,6 +417,7 @@ describe('POST /api/webhooks/github', () => {
       expect.objectContaining({
         status: 'CLOSED',
         pr_closed_at: '2026-08-17T01:00:00Z',
+        updated_since_review: false,
       })
     )
     expect(prsChain.eq).toHaveBeenCalledWith('owner', OWNER)

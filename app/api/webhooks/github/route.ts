@@ -6,9 +6,8 @@ import { verifyGitHubSignature } from '../../../../src/lib/webhook'
  * GitHub pull_request webhook payload (the fields we care about).
  */
 interface GitHubPrPayload {
-  action: string
-  number: number
-  pull_request: {
+  action?: string
+  pull_request?: {
     number: number
     title: string
     html_url: string
@@ -17,7 +16,7 @@ interface GitHubPrPayload {
     created_at: string
     closed_at: string | null
   }
-  repository: {
+  repository?: {
     name: string
     owner: { login: string }
   }
@@ -28,12 +27,13 @@ interface GitHubPrPayload {
  *
  * Receives GitHub `pull_request` webhook events and keeps `tracked_prs` in sync:
  *   opened / reopened → upsert with status=OPEN, source=WEBHOOK
- *   closed            → update status=CLOSED, pr_closed_at
+ *   closed            → update status=CLOSED, pr_closed_at, updated_since_review=false
  *   synchronize       → flip REVIEWED → OPEN and set updated_since_review=true
  *
  * Returns 204 for unrecognised event types or ignored actions.
- * Returns 401 when the HMAC signature is invalid or webhook_secret is not configured.
- * Returns 404 when the repository is not in configured_repos.
+ * Returns 401 for any authentication/authorization failure (signature missing or
+ * invalid, secret not configured, or repo not found) — all failure modes return
+ * the same status code to prevent repo existence enumeration.
  */
 export async function POST(request: NextRequest) {
   const event = request.headers.get('x-github-event')
@@ -41,6 +41,15 @@ export async function POST(request: NextRequest) {
   // Only care about pull_request events
   if (event !== 'pull_request') {
     return new NextResponse(null, { status: 204 })
+  }
+
+  // Reject immediately if no signature header — no DB call needed.
+  const signature = request.headers.get('x-hub-signature-256')
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'Missing webhook signature' },
+      { status: 401 }
+    )
   }
 
   const rawBody = await request.text()
@@ -63,7 +72,8 @@ export async function POST(request: NextRequest) {
 
   const service = createSupabaseServiceRoleClient()
 
-  // Look up the repo to get webhook_secret (and confirm it is configured)
+  // Look up the repo to get its webhook_secret.
+  // Return 401 (not 404) for unknown repos to prevent existence enumeration.
   const { data: configuredRepo, error: repoLookupError } = await service
     .from('configured_repos')
     .select('id, webhook_secret')
@@ -72,13 +82,10 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (repoLookupError || !configuredRepo) {
-    return NextResponse.json(
-      { error: 'Repository not configured' },
-      { status: 404 }
-    )
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // HMAC validation — always required; a repo without a secret is misconfigured.
+  // A repo without a secret is misconfigured — reject rather than bypass HMAC.
   const webhookSecret: string | null = configuredRepo.webhook_secret
   if (!webhookSecret) {
     return NextResponse.json(
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     )
   }
-  const signature = request.headers.get('x-hub-signature-256')
+
   if (!verifyGitHubSignature(rawBody, webhookSecret, signature)) {
     return NextResponse.json(
       { error: 'Invalid webhook signature' },
@@ -94,13 +101,22 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { action, pull_request: pr } = payload
+  const action = payload.action
+  if (!action) {
+    return NextResponse.json(
+      { error: 'Missing action in payload' },
+      { status: 400 }
+    )
+  }
+
+  const pr = payload.pull_request
   if (!pr) {
     return NextResponse.json(
       { error: 'Missing pull_request in payload' },
       { status: 400 }
     )
   }
+
   const prNumber = pr.number
   const prUrl = pr.html_url
   const prTitle = pr.title
@@ -108,6 +124,8 @@ export async function POST(request: NextRequest) {
   const prOpenedAt = pr.created_at
 
   if (action === 'opened' || action === 'reopened') {
+    // updated_since_review is reset to false on reopen: the PR is OPEN and
+    // awaiting a fresh review, so the flag is no longer meaningful.
     const { error } = await service.from('tracked_prs').upsert(
       {
         owner,
@@ -142,7 +160,11 @@ export async function POST(request: NextRequest) {
     const prClosedAt = pr.closed_at ?? new Date().toISOString()
     const { data: updated, error } = await service
       .from('tracked_prs')
-      .update({ status: 'CLOSED', pr_closed_at: prClosedAt })
+      .update({
+        status: 'CLOSED',
+        pr_closed_at: prClosedAt,
+        updated_since_review: false,
+      })
       .eq('owner', owner)
       .eq('repo', repo)
       .eq('pr_number', prNumber)
