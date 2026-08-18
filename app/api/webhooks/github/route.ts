@@ -37,20 +37,23 @@ interface GitHubPrPayload {
  * the same status code to prevent repo existence enumeration.
  */
 export async function POST(request: NextRequest) {
+  // Reject immediately if no signature header — no DB call needed.
+  // This gate runs before the event-type check so that non-pull_request events
+  // (ping, push, etc.) are also rejected when unauthenticated, preventing
+  // unauthenticated callers from probing the endpoint with arbitrary events.
+  // Full HMAC verification of these events is skipped because we don't need
+  // the payload to process them — returning 204 is sufficient acknowledgement
+  // for events we intentionally ignore.
+  const signature = request.headers.get('x-hub-signature-256')
+  if (!signature) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const event = request.headers.get('x-github-event')
 
   // Only care about pull_request events
   if (event !== 'pull_request') {
     return new NextResponse(null, { status: 204 })
-  }
-
-  // Reject immediately if no signature header — no DB call needed.
-  const signature = request.headers.get('x-hub-signature-256')
-  if (!signature) {
-    return NextResponse.json(
-      { error: 'Missing webhook signature' },
-      { status: 401 }
-    )
   }
 
   const rawBody = await request.text()
@@ -92,19 +95,15 @@ export async function POST(request: NextRequest) {
   }
 
   // A repo without a secret is misconfigured — reject rather than bypass HMAC.
+  // All 401 paths return the same generic body so callers cannot distinguish
+  // unknown-repo from bad-signature from missing-secret via response content.
   const webhookSecret: string | null = configuredRepo.webhook_secret
   if (!webhookSecret) {
-    return NextResponse.json(
-      { error: 'Webhook secret not configured for this repository' },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (!verifyGitHubSignature(rawBody, webhookSecret, signature)) {
-    return NextResponse.json(
-      { error: 'Invalid webhook signature' },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const action = payload.action
@@ -225,7 +224,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'synchronize') {
-    // Only flip back PRs that are already REVIEWED; other statuses are unaffected.
+    // Only flip back PRs that are already REVIEWED; other statuses are intentional
+    // no-ops. A PR in OPEN status already has no review to invalidate. A PR in
+    // IN_REVIEW status will be evaluated against the latest commits naturally.
     const { error } = await service
       .from('tracked_prs')
       .update({ status: 'OPEN', updated_since_review: true })

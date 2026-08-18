@@ -135,7 +135,7 @@ describe('POST /api/webhooks/github', () => {
 
   // ── Non pull_request events ────────────────────────────────────────────────
 
-  it('returns 204 for non-pull_request events', async () => {
+  it('returns 204 for non-pull_request events (signature present)', async () => {
     const body = JSON.stringify({ action: 'created' })
     const req = makeRequest(body, { event: 'push' })
     const res = await POST(req)
@@ -143,7 +143,19 @@ describe('POST /api/webhooks/github', () => {
     expect(mockServiceFromFn).not.toHaveBeenCalled()
   })
 
-  it('returns 204 for ping events', async () => {
+  it('returns 401 for non-pull_request events when signature header is absent', async () => {
+    const body = JSON.stringify({ action: 'created' })
+    const req = new NextRequest('http://localhost/api/webhooks/github', {
+      method: 'POST',
+      body,
+      headers: { 'content-type': 'application/json', 'x-github-event': 'push' },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(401)
+    expect(mockServiceFromFn).not.toHaveBeenCalled()
+  })
+
+  it('returns 204 for ping events (signature present)', async () => {
     const body = JSON.stringify({ zen: 'Keep it logically awesome.' })
     const req = makeRequest(body, { event: 'ping' })
     const res = await POST(req)
@@ -209,22 +221,23 @@ describe('POST /api/webhooks/github', () => {
     const res = await POST(req)
     expect(res.status).toBe(401)
     const json = await res.json()
-    expect(json.error).toMatch(/signature/i)
+    expect(json.error).toBe('Unauthorized')
     // Must short-circuit before touching the DB
     expect(mockServiceFromFn).not.toHaveBeenCalled()
   })
 
   // ── Repo not configured ────────────────────────────────────────────────────
 
-  it('returns 401 (not 404) when repo is not in configured_repos — prevents enumeration', async () => {
+  it('returns 401 with same body for unknown repo as for bad signature — prevents enumeration', async () => {
     const notFoundChain = makeChain({ data: null, error: { code: 'PGRST116' } })
     mockServiceFromFn.mockReturnValue(notFoundChain)
 
     const body = buildPayload('opened')
     const req = makeRequest(body)
     const res = await POST(req)
-    // 401 instead of 404 so callers can't distinguish unknown-repo from bad-signature
     expect(res.status).toBe(401)
+    const json = await res.json()
+    expect(json.error).toBe('Unauthorized')
   })
 
   it('returns 401 when signature is wrong', async () => {
@@ -245,7 +258,7 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 401 when webhook_secret is null (repo misconfigured)', async () => {
+  it('returns 401 with generic body when webhook_secret is null (repo misconfigured)', async () => {
     const repoChain = makeConfiguredRepo(null)
     mockServiceFromFn.mockReturnValueOnce(repoChain)
 
@@ -264,7 +277,27 @@ describe('POST /api/webhooks/github', () => {
     const res = await POST(req)
     expect(res.status).toBe(401)
     const json = await res.json()
-    expect(json.error).toMatch(/secret not configured/i)
+    expect(json.error).toBe('Unauthorized')
+  })
+
+  it('returns same 401 body for bad signature as for unknown repo — prevents enumeration', async () => {
+    const repoChain = makeConfiguredRepo(WEBHOOK_SECRET)
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
+
+    const body = buildPayload('opened')
+    const req = new NextRequest('http://localhost/api/webhooks/github', {
+      method: 'POST',
+      body,
+      headers: {
+        'content-type': 'application/json',
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': 'sha256=deadbeef' + 'a'.repeat(56),
+      },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(401)
+    const json = await res.json()
+    expect(json.error).toBe('Unauthorized')
   })
 
   // ── Missing action / pull_request fields ─────────────────────────────────────
