@@ -5,12 +5,13 @@
  * Tests cover:
  *   - Non-pull_request event → 204
  *   - Repo not configured → 404
- *   - Invalid HMAC when secret is set → 401
+ *   - No webhook_secret on repo → 401 (misconfigured, always required)
+ *   - Invalid HMAC → 401
+ *   - Missing pull_request field in payload → 400
  *   - opened / reopened → 200 + upsert
- *   - closed → 200 + update
+ *   - closed → 200 + update; matched=0 logged for untracked PRs
  *   - synchronize → 200 + conditional update
  *   - Unrecognised action → 204
- *   - No webhook_secret → accepts without HMAC check
  *   - DB error paths → 500
  */
 
@@ -64,7 +65,11 @@ function makeConfiguredRepo(webhookSecret: string | null = WEBHOOK_SECRET) {
 }
 
 function makeTrackedPrsChain(error: unknown = null) {
-  return makeChain({ data: { id: 'pr-uuid' }, error })
+  return makeChain({ data: [{ id: 'pr-uuid' }], error })
+}
+
+function makeEmptyUpdateChain() {
+  return makeChain({ data: [], error: null })
 }
 
 function buildPayload(action: string, overrides: Record<string, unknown> = {}) {
@@ -236,15 +241,11 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(401)
   })
 
-  it('skips HMAC check when webhook_secret is null', async () => {
+  it('returns 401 when webhook_secret is null (repo misconfigured)', async () => {
     const repoChain = makeConfiguredRepo(null)
-    const prsChain = makeTrackedPrsChain()
-    mockServiceFromFn
-      .mockReturnValueOnce(repoChain) // configured_repos lookup
-      .mockReturnValueOnce(prsChain) // tracked_prs upsert
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
 
     const body = buildPayload('opened')
-    // No signature header
     const req = new NextRequest('http://localhost/api/webhooks/github', {
       method: 'POST',
       body,
@@ -254,9 +255,37 @@ describe('POST /api/webhooks/github', () => {
       },
     })
     const res = await POST(req)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(401)
     const json = await res.json()
-    expect(json.ok).toBe(true)
+    expect(json.error).toMatch(/secret not configured/i)
+  })
+
+  // ── Missing pull_request field ───────────────────────────────────────────────
+
+  it('returns 400 when pull_request field is absent from a well-formed payload', async () => {
+    const repoChain = makeConfiguredRepo()
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
+
+    const rawBody = JSON.stringify({
+      action: 'opened',
+      number: 42,
+      // no pull_request key
+      repository: { name: REPO, owner: { login: OWNER } },
+    })
+    const sig = computeGitHubSignature(rawBody, WEBHOOK_SECRET)
+    const req = new NextRequest('http://localhost/api/webhooks/github', {
+      method: 'POST',
+      body: rawBody,
+      headers: {
+        'content-type': 'application/json',
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': sig,
+      },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/pull_request/i)
   })
 
   // ── opened / reopened ────────────────────────────────────────────────────────
@@ -342,6 +371,7 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.action).toBe('closed')
+    expect(json.matched).toBe(1)
 
     expect(prsChain.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -352,6 +382,23 @@ describe('POST /api/webhooks/github', () => {
     expect(prsChain.eq).toHaveBeenCalledWith('owner', OWNER)
     expect(prsChain.eq).toHaveBeenCalledWith('repo', REPO)
     expect(prsChain.eq).toHaveBeenCalledWith('pr_number', 42)
+    expect(prsChain.select).toHaveBeenCalledWith('id')
+  })
+
+  it('returns 200 with matched=0 for closed event on untracked PR', async () => {
+    const repoChain = makeConfiguredRepo()
+    const prsChain = makeEmptyUpdateChain()
+    mockServiceFromFn
+      .mockReturnValueOnce(repoChain)
+      .mockReturnValueOnce(prsChain)
+
+    const body = buildPayload('closed')
+    const req = makeRequest(body)
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.matched).toBe(0)
   })
 
   it('returns 500 when update fails on closed', async () => {

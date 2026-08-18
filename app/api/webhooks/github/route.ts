@@ -32,7 +32,7 @@ interface GitHubPrPayload {
  *   synchronize       → flip REVIEWED → OPEN and set updated_since_review=true
  *
  * Returns 204 for unrecognised event types or ignored actions.
- * Returns 401 when the HMAC signature is invalid (and a webhook_secret is set).
+ * Returns 401 when the HMAC signature is invalid or webhook_secret is not configured.
  * Returns 404 when the repository is not in configured_repos.
  */
 export async function POST(request: NextRequest) {
@@ -78,19 +78,29 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // HMAC validation — enforced only when the repo has a webhook_secret set
+  // HMAC validation — always required; a repo without a secret is misconfigured.
   const webhookSecret: string | null = configuredRepo.webhook_secret
-  if (webhookSecret) {
-    const signature = request.headers.get('x-hub-signature-256')
-    if (!verifyGitHubSignature(rawBody, webhookSecret, signature)) {
-      return NextResponse.json(
-        { error: 'Invalid webhook signature' },
-        { status: 401 }
-      )
-    }
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { error: 'Webhook secret not configured for this repository' },
+      { status: 401 }
+    )
+  }
+  const signature = request.headers.get('x-hub-signature-256')
+  if (!verifyGitHubSignature(rawBody, webhookSecret, signature)) {
+    return NextResponse.json(
+      { error: 'Invalid webhook signature' },
+      { status: 401 }
+    )
   }
 
   const { action, pull_request: pr } = payload
+  if (!pr) {
+    return NextResponse.json(
+      { error: 'Missing pull_request in payload' },
+      { status: 400 }
+    )
+  }
   const prNumber = pr.number
   const prUrl = pr.html_url
   const prTitle = pr.title
@@ -130,12 +140,13 @@ export async function POST(request: NextRequest) {
 
   if (action === 'closed') {
     const prClosedAt = pr.closed_at ?? new Date().toISOString()
-    const { error } = await service
+    const { data: updated, error } = await service
       .from('tracked_prs')
       .update({ status: 'CLOSED', pr_closed_at: prClosedAt })
       .eq('owner', owner)
       .eq('repo', repo)
       .eq('pr_number', prNumber)
+      .select('id')
 
     if (error) {
       console.error('[POST /api/webhooks/github] update error (closed)', error)
@@ -144,7 +155,13 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-    return NextResponse.json({ ok: true, action })
+    const matched = Array.isArray(updated) ? updated.length : 0
+    if (matched === 0) {
+      console.warn(
+        `[POST /api/webhooks/github] closed event for untracked PR ${owner}/${repo}#${prNumber}`
+      )
+    }
+    return NextResponse.json({ ok: true, action, matched })
   }
 
   if (action === 'synchronize') {
