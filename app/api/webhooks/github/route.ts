@@ -72,7 +72,12 @@ export async function POST(request: NextRequest) {
 
   const service = createSupabaseServiceRoleClient()
 
-  // Look up the repo to get its webhook_secret.
+  // DB lookup using attacker-supplied owner/repo to obtain the per-repo secret.
+  // This ordering dependency is inherent to the per-repo secret design: we must
+  // identify the repo before we can retrieve its secret for HMAC verification.
+  // The HMAC is computed over rawBody (not parsed fields), so forged owner/repo
+  // values in the payload only affect which secret is fetched — the signature
+  // check still fails unless the caller knows that repo's actual secret.
   // Return 401 (not 404) for unknown repos to prevent existence enumeration.
   const { data: configuredRepo, error: repoLookupError } = await service
     .from('configured_repos')
@@ -124,24 +129,33 @@ export async function POST(request: NextRequest) {
   const prOpenedAt = pr.created_at
 
   if (action === 'opened' || action === 'reopened') {
-    // updated_since_review is reset to false on reopen: the PR is OPEN and
-    // awaiting a fresh review, so the flag is no longer meaningful.
-    const { error } = await service.from('tracked_prs').upsert(
-      {
-        owner,
-        repo,
-        pr_number: prNumber,
-        pr_url: prUrl,
-        pr_title: prTitle,
-        pr_author: prAuthor,
-        pr_opened_at: prOpenedAt,
-        pr_closed_at: null,
-        status: 'OPEN',
-        updated_since_review: false,
-        source: 'WEBHOOK',
-      },
-      { onConflict: 'owner,repo,pr_number', ignoreDuplicates: false }
-    )
+    const baseFields = {
+      owner,
+      repo,
+      pr_number: prNumber,
+      pr_url: prUrl,
+      pr_title: prTitle,
+      pr_author: prAuthor,
+      pr_opened_at: prOpenedAt,
+      pr_closed_at: null,
+      status: 'OPEN',
+      source: 'WEBHOOK',
+    }
+    // For a brand-new PR (opened) initialise the flag to false — no review yet.
+    // For reopened, omit the field so Supabase preserves whatever value is already
+    // stored: a REVIEWED PR that was closed and then reopened after new commits
+    // should retain updated_since_review=true so it surfaces for re-review.
+    const upsertData =
+      action === 'opened'
+        ? { ...baseFields, updated_since_review: false }
+        : baseFields
+
+    const { error } = await service
+      .from('tracked_prs')
+      .upsert(upsertData, {
+        onConflict: 'owner,repo,pr_number',
+        ignoreDuplicates: false,
+      })
 
     if (error) {
       console.error(

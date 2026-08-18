@@ -362,7 +362,7 @@ describe('POST /api/webhooks/github', () => {
     )
   })
 
-  it('upserts with status=OPEN on reopened', async () => {
+  it('upserts with status=OPEN on reopened and does NOT reset updated_since_review', async () => {
     const repoChain = makeConfiguredRepo()
     const prsChain = makeTrackedPrsChain()
     mockServiceFromFn
@@ -376,10 +376,10 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.action).toBe('reopened')
-    expect(prsChain.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'OPEN', source: 'WEBHOOK' }),
-      expect.anything()
-    )
+    // updated_since_review must be absent so an existing true value is preserved
+    const upsertArg = (prsChain.upsert as jest.Mock).mock.calls[0][0]
+    expect(upsertArg).toMatchObject({ status: 'OPEN', source: 'WEBHOOK' })
+    expect(upsertArg).not.toHaveProperty('updated_since_review')
   })
 
   it('returns 500 when upsert fails on opened', async () => {
