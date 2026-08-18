@@ -134,13 +134,32 @@ describe('POST /api/webhooks/github', () => {
   })
 
   // ── Non pull_request events ────────────────────────────────────────────────
+  // Auth (body read + DB lookup + HMAC verify) now runs before the event-type
+  // branch, so non-PR events are fully authenticated before the 204 response.
 
-  it('returns 204 for non-pull_request events (signature present)', async () => {
+  it('returns 401 for non-pull_request events when payload has no repository info', async () => {
+    // Can't identify repo → dummy HMAC equalises timing → 401, no DB call
     const body = JSON.stringify({ action: 'created' })
     const req = makeRequest(body, { event: 'push' })
     const res = await POST(req)
-    expect(res.status).toBe(204)
+    expect(res.status).toBe(401)
     expect(mockServiceFromFn).not.toHaveBeenCalled()
+  })
+
+  it('returns 204 for non-pull_request events with valid auth', async () => {
+    const repoChain = makeConfiguredRepo()
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
+
+    const body = JSON.stringify({
+      ref: 'refs/heads/main',
+      repository: { name: REPO, owner: { login: OWNER } },
+    })
+    const req = makeRequest(body, { event: 'push' })
+    const res = await POST(req)
+    expect(res.status).toBe(204)
+    // Only the configured_repos lookup — tracked_prs is never touched
+    expect(mockServiceFromFn).toHaveBeenCalledTimes(1)
+    expect(mockServiceFromFn).toHaveBeenCalledWith('configured_repos')
   })
 
   it('returns 401 for non-pull_request events when signature header is absent', async () => {
@@ -155,8 +174,15 @@ describe('POST /api/webhooks/github', () => {
     expect(mockServiceFromFn).not.toHaveBeenCalled()
   })
 
-  it('returns 204 for ping events (signature present)', async () => {
-    const body = JSON.stringify({ zen: 'Keep it logically awesome.' })
+  it('returns 204 for ping events with valid auth', async () => {
+    // ping payloads include repository info — auth runs before the 204 acknowledgement
+    const repoChain = makeConfiguredRepo()
+    mockServiceFromFn.mockReturnValueOnce(repoChain)
+
+    const body = JSON.stringify({
+      zen: 'Keep it logically awesome.',
+      repository: { name: REPO, owner: { login: OWNER } },
+    })
     const req = makeRequest(body, { event: 'ping' })
     const res = await POST(req)
     expect(res.status).toBe(204)
@@ -183,7 +209,10 @@ describe('POST /api/webhooks/github', () => {
 
   // ── Missing repository info ────────────────────────────────────────────────
 
-  it('returns 400 when payload is missing repository info', async () => {
+  it('returns 401 when repository info is missing in payload', async () => {
+    // Can't identify repo → dummy HMAC equalises timing → 401, no DB call.
+    // (Returns 401 rather than 400 so the error path is indistinguishable from
+    // an unknown repo, preventing callers from inferring structure from status codes.)
     const body = JSON.stringify({
       action: 'opened',
       number: 42,
@@ -200,9 +229,10 @@ describe('POST /api/webhooks/github', () => {
       },
     })
     const res = await POST(req)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(401)
     const json = await res.json()
-    expect(json.error).toMatch(/repository/i)
+    expect(json.error).toBe('Unauthorized')
+    expect(mockServiceFromFn).not.toHaveBeenCalled()
   })
 
   // ── HMAC validation (early rejection + enumeration prevention) ───────────────
@@ -519,6 +549,7 @@ describe('POST /api/webhooks/github', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.action).toBe('synchronize')
+    expect(json.matched).toBe(1)
 
     expect(prsChain.update).toHaveBeenCalledWith({
       status: 'OPEN',
@@ -526,6 +557,23 @@ describe('POST /api/webhooks/github', () => {
     })
     // Must filter by status=REVIEWED so only reviewed PRs get flipped
     expect(prsChain.eq).toHaveBeenCalledWith('status', 'REVIEWED')
+    expect(prsChain.select).toHaveBeenCalledWith('id')
+  })
+
+  it('returns 200 with matched=0 when synchronize finds no REVIEWED PRs', async () => {
+    const repoChain = makeConfiguredRepo()
+    const prsChain = makeEmptyUpdateChain()
+    mockServiceFromFn
+      .mockReturnValueOnce(repoChain)
+      .mockReturnValueOnce(prsChain)
+
+    const body = buildPayload('synchronize')
+    const req = makeRequest(body)
+    const res = await POST(req)
+
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.matched).toBe(0)
   })
 
   it('returns 500 when update fails on synchronize', async () => {
