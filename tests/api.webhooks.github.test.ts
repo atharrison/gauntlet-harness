@@ -411,13 +411,10 @@ describe('POST /api/webhooks/github', () => {
     expect(json.action).toBe('reopened')
     // Must use update, not upsert
     expect(prsChain.upsert).not.toHaveBeenCalled()
-    expect(prsChain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'OPEN' })
-    )
-    // updated_since_review and source must NOT be in the update payload
+    // source=WEBHOOK is required by AC for reopened; updated_since_review is preserved
     const updateArg = (prsChain.update as jest.Mock).mock.calls[0][0]
+    expect(updateArg).toMatchObject({ status: 'OPEN', source: 'WEBHOOK' })
     expect(updateArg).not.toHaveProperty('updated_since_review')
-    expect(updateArg).not.toHaveProperty('source')
   })
 
   it('returns 500 when update fails on reopened', async () => {

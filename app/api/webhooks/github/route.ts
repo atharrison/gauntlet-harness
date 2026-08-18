@@ -2,6 +2,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceRoleClient } from '../../../../src/lib/supabase/server'
 import { verifyGitHubSignature } from '../../../../src/lib/webhook'
 
+// Constant used for timing-safe dummy HMAC comparisons when no repo row is
+// found or when the repo has no secret. Keeps the latency profile of a
+// "missing repo" response indistinguishable from "wrong signature".
+const TIMING_DUMMY_SECRET = 'timing-equalization-dummy-secret-not-used-for-auth'
+
 /**
  * GitHub pull_request webhook payload (the fields we care about).
  */
@@ -27,7 +32,7 @@ interface GitHubPrPayload {
  *
  * Receives GitHub `pull_request` webhook events and keeps `tracked_prs` in sync:
  *   opened    → upsert (idempotent); initialises updated_since_review=false
- *   reopened  → update only (preserves updated_since_review and source)
+ *   reopened  → update only; sets source=WEBHOOK, preserves updated_since_review
  *   closed            → update status=CLOSED, pr_closed_at, updated_since_review=false
  *   synchronize       → flip REVIEWED → OPEN and set updated_since_review=true
  *
@@ -91,6 +96,10 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (repoLookupError || !configuredRepo) {
+    // Perform a dummy HMAC comparison so the latency profile for an unknown repo
+    // is indistinguishable from a known repo with a wrong signature, closing the
+    // timing side-channel that would otherwise reveal repo existence.
+    verifyGitHubSignature(rawBody, TIMING_DUMMY_SECRET, signature)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -99,6 +108,7 @@ export async function POST(request: NextRequest) {
   // unknown-repo from bad-signature from missing-secret via response content.
   const webhookSecret: string | null = configuredRepo.webhook_secret
   if (!webhookSecret) {
+    verifyGitHubSignature(rawBody, TIMING_DUMMY_SECRET, signature)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -160,13 +170,14 @@ export async function POST(request: NextRequest) {
 
   if (action === 'reopened') {
     // Use update (not upsert) so we only touch the fields that should change.
+    // source=WEBHOOK is set per the acceptance criteria (opened/reopened → WEBHOOK).
     // updated_since_review is intentionally omitted: a REVIEWED PR reopened after
     // new commits must retain updated_since_review=true so it surfaces for re-review.
-    // source is intentionally omitted: a manually-added PR must retain source=MANUAL.
     const { error } = await service
       .from('tracked_prs')
       .update({
         status: 'OPEN',
+        source: 'WEBHOOK',
         pr_url: prUrl,
         pr_title: prTitle,
         pr_author: prAuthor,
