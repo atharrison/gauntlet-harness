@@ -168,13 +168,16 @@ export async function POST(request: NextRequest) {
   if (action === 'reopened') {
     // Use update (not upsert) so we only touch the fields that should change.
     // source=WEBHOOK is set per the acceptance criteria (opened/reopened → WEBHOOK).
-    // updated_since_review is intentionally omitted: a REVIEWED PR reopened after
-    // new commits must retain updated_since_review=true so it surfaces for re-review.
+    // updated_since_review is set to false explicitly: the closed handler always
+    // writes false in the normal flow, so this is consistent with that behaviour
+    // and also handles the edge case where a closed event was missed (which would
+    // otherwise preserve a stale true from a prior synchronize event).
     const { error } = await service
       .from('tracked_prs')
       .update({
         status: 'OPEN',
         source: 'WEBHOOK',
+        updated_since_review: false,
         pr_url: prUrl,
         pr_title: prTitle,
         pr_author: prAuthor,
