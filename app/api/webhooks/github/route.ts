@@ -26,7 +26,8 @@ interface GitHubPrPayload {
  * POST /api/webhooks/github
  *
  * Receives GitHub `pull_request` webhook events and keeps `tracked_prs` in sync:
- *   opened / reopened → upsert with status=OPEN, source=WEBHOOK
+ *   opened    → upsert (idempotent); initialises updated_since_review=false
+ *   reopened  → update only (preserves updated_since_review and source)
  *   closed            → update status=CLOSED, pr_closed_at, updated_since_review=false
  *   synchronize       → flip REVIEWED → OPEN and set updated_since_review=true
  *
@@ -128,38 +129,58 @@ export async function POST(request: NextRequest) {
   const prAuthor = pr.user?.login ?? null
   const prOpenedAt = pr.created_at
 
-  if (action === 'opened' || action === 'reopened') {
-    const baseFields = {
-      owner,
-      repo,
-      pr_number: prNumber,
-      pr_url: prUrl,
-      pr_title: prTitle,
-      pr_author: prAuthor,
-      pr_opened_at: prOpenedAt,
-      pr_closed_at: null,
-      status: 'OPEN',
-      source: 'WEBHOOK',
-    }
-    // For a brand-new PR (opened) initialise the flag to false — no review yet.
-    // For reopened, omit the field so Supabase preserves whatever value is already
-    // stored: a REVIEWED PR that was closed and then reopened after new commits
-    // should retain updated_since_review=true so it surfaces for re-review.
-    const upsertData =
-      action === 'opened'
-        ? { ...baseFields, updated_since_review: false }
-        : baseFields
+  if (action === 'opened') {
+    // Upsert so duplicate webhook deliveries are idempotent.
+    // Explicitly initialise updated_since_review=false — no review exists yet.
+    const { error } = await service.from('tracked_prs').upsert(
+      {
+        owner,
+        repo,
+        pr_number: prNumber,
+        pr_url: prUrl,
+        pr_title: prTitle,
+        pr_author: prAuthor,
+        pr_opened_at: prOpenedAt,
+        pr_closed_at: null,
+        status: 'OPEN',
+        updated_since_review: false,
+        source: 'WEBHOOK',
+      },
+      { onConflict: 'owner,repo,pr_number', ignoreDuplicates: false }
+    )
 
+    if (error) {
+      console.error('[POST /api/webhooks/github] upsert error (opened)', error)
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ ok: true, action })
+  }
+
+  if (action === 'reopened') {
+    // Use update (not upsert) so we only touch the fields that should change.
+    // updated_since_review is intentionally omitted: a REVIEWED PR reopened after
+    // new commits must retain updated_since_review=true so it surfaces for re-review.
+    // source is intentionally omitted: a manually-added PR must retain source=MANUAL.
     const { error } = await service
       .from('tracked_prs')
-      .upsert(upsertData, {
-        onConflict: 'owner,repo,pr_number',
-        ignoreDuplicates: false,
+      .update({
+        status: 'OPEN',
+        pr_url: prUrl,
+        pr_title: prTitle,
+        pr_author: prAuthor,
+        pr_opened_at: prOpenedAt,
+        pr_closed_at: null,
       })
+      .eq('owner', owner)
+      .eq('repo', repo)
+      .eq('pr_number', prNumber)
 
     if (error) {
       console.error(
-        `[POST /api/webhooks/github] upsert error (${action})`,
+        '[POST /api/webhooks/github] update error (reopened)',
         error
       )
       return NextResponse.json(
@@ -171,6 +192,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'closed') {
+    // Intentional no-op for untracked PRs: if the PR was never in tracked_prs,
+    // the update matches zero rows, error is null, and matched=0 is returned.
+    // A console.warn is emitted so operators can detect misconfiguration.
     const prClosedAt = pr.closed_at ?? new Date().toISOString()
     const { data: updated, error } = await service
       .from('tracked_prs')
