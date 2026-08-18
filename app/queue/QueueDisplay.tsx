@@ -89,11 +89,13 @@ export default function QueueDisplay({
 }) {
   const router = useRouter()
   const [removingId, setRemovingId] = useState<string | null>(null)
-  const [startingId, setStartingId] = useState<string | null>(null)
+  const [startingIds, setStartingIds] = useState<Set<string>>(new Set())
+  const [startError, setStartError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
 
   async function handleStartReview(pr: TrackedPr) {
-    setStartingId(pr.id)
+    setStartingIds(prev => new Set(prev).add(pr.id))
+    setStartError(null)
     try {
       const res = await fetch('/api/review/start', {
         method: 'POST',
@@ -101,13 +103,27 @@ export default function QueueDisplay({
         body: JSON.stringify({ prUrl: pr.pr_url }),
       })
       if (!res.ok) {
-        console.error('[QueueDisplay] review start failed', await res.json())
+        console.error('[QueueDisplay] review start failed', await res.text())
+        setStartError('Failed to start review — please try again.')
         return
       }
       const { reviewId } = (await res.json()) as { reviewId: string }
+      // Validate before using in navigation to guard against unexpected server responses
+      if (!/^[0-9a-f-]{36}$/i.test(reviewId)) {
+        console.error('[QueueDisplay] unexpected reviewId format', reviewId)
+        setStartError('Unexpected server response — please try again.')
+        return
+      }
       router.push(`/review/${reviewId}?prUrl=${encodeURIComponent(pr.pr_url)}`)
+    } catch (err) {
+      console.error('[QueueDisplay] review start error', err)
+      setStartError('Failed to start review — please try again.')
     } finally {
-      setStartingId(null)
+      setStartingIds(prev => {
+        const next = new Set(prev)
+        next.delete(pr.id)
+        return next
+      })
     }
   }
 
@@ -181,6 +197,11 @@ export default function QueueDisplay({
   return (
     <div className="space-y-6">
       {filterBar}
+      {startError && (
+        <div className="rounded-md border border-red-800 bg-red-950/40 px-4 py-2 text-sm text-red-400">
+          {startError}
+        </div>
+      )}
       {groups.length === 0 && (
         <p className="py-8 text-center text-sm text-gray-500">
           No {statusFilter.toLowerCase().replace('_', ' ')} PRs.
@@ -205,7 +226,7 @@ export default function QueueDisplay({
           <div className="divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-900">
             {group.prs.map(pr => {
               const isRemoving = removingId === pr.id
-              const isStarting = startingId === pr.id
+              const isStarting = startingIds.has(pr.id)
               const isClosed = pr.status === 'CLOSED'
               const isReviewed = pr.status === 'REVIEWED'
               const isOpen = pr.status === 'OPEN'
