@@ -109,7 +109,11 @@ export default function QueueDisplay({
       }
       const { reviewId } = (await res.json()) as { reviewId: string }
       // Validate before using in navigation to guard against unexpected server responses
-      if (!/^[0-9a-f-]{36}$/i.test(reviewId)) {
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          reviewId
+        )
+      ) {
         console.error('[QueueDisplay] unexpected reviewId format', reviewId)
         setStartError('Unexpected server response — please try again.')
         return
