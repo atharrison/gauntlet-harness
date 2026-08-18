@@ -89,7 +89,27 @@ export default function QueueDisplay({
 }) {
   const router = useRouter()
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [startingId, setStartingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
+
+  async function handleStartReview(pr: TrackedPr) {
+    setStartingId(pr.id)
+    try {
+      const res = await fetch('/api/review/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prUrl: pr.pr_url }),
+      })
+      if (!res.ok) {
+        console.error('[QueueDisplay] review start failed', await res.json())
+        return
+      }
+      const { reviewId } = (await res.json()) as { reviewId: string }
+      router.push(`/review/${reviewId}?prUrl=${encodeURIComponent(pr.pr_url)}`)
+    } finally {
+      setStartingId(null)
+    }
+  }
 
   async function handleRemove(pr: TrackedPr) {
     if (
@@ -185,10 +205,10 @@ export default function QueueDisplay({
           <div className="divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-900">
             {group.prs.map(pr => {
               const isRemoving = removingId === pr.id
+              const isStarting = startingId === pr.id
               const isClosed = pr.status === 'CLOSED'
               const isReviewed = pr.status === 'REVIEWED'
               const isOpen = pr.status === 'OPEN'
-              const reviewUrl = `/?prUrl=${encodeURIComponent(pr.pr_url)}`
 
               return (
                 <div
@@ -233,20 +253,26 @@ export default function QueueDisplay({
 
                   <div className="flex shrink-0 items-center gap-2">
                     {(isOpen || pr.updated_since_review) && !isClosed && (
-                      <a
-                        href={reviewUrl}
-                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                      <button
+                        onClick={() => handleStartReview(pr)}
+                        disabled={isStarting}
+                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
                       >
-                        {isReviewed ? 'Re-review' : 'Start Review'}
-                      </a>
+                        {isStarting
+                          ? '…'
+                          : isReviewed
+                            ? 'Re-review'
+                            : 'Start Review'}
+                      </button>
                     )}
                     {isReviewed && !pr.updated_since_review && (
-                      <a
-                        href={reviewUrl}
-                        className="rounded-md border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:border-gray-600 hover:text-gray-200"
+                      <button
+                        onClick={() => handleStartReview(pr)}
+                        disabled={isStarting}
+                        className="rounded-md border border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-400 transition hover:border-gray-600 hover:text-gray-200 disabled:opacity-50"
                       >
-                        Re-review
-                      </a>
+                        {isStarting ? '…' : 'Re-review'}
+                      </button>
                     )}
                     {pr.status === 'IN_REVIEW' && (
                       <span className="rounded-md border border-yellow-800 px-3 py-1.5 text-xs font-medium text-yellow-400">
