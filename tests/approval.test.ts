@@ -22,9 +22,17 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
   }
 }
 
-const blocking = makeFinding({ id: 'b1', severity: 'BLOCKING' })
-const suggestion = makeFinding({ id: 's1', severity: 'SUGGESTION' })
-const nit = makeFinding({ id: 'n1', severity: 'NIT' })
+const blocking = makeFinding({
+  id: 'b1',
+  severity: 'BLOCKING',
+  title: 'Blocking finding',
+})
+const suggestion = makeFinding({
+  id: 's1',
+  severity: 'SUGGESTION',
+  title: 'Suggestion finding',
+})
+const nit = makeFinding({ id: 'n1', severity: 'NIT', title: 'Nit finding' })
 
 const review: PRReview = {
   reviewId: 'rev-1',
@@ -147,5 +155,31 @@ describe('formatGitHubComment', () => {
     const sub = buildSubmission(state, true)
     const comment = formatGitHubComment(review, sub)
     expect(comment).toContain('Run unit tests')
+  })
+
+  it('omits nit section when nit is not accepted (default)', () => {
+    const state = buildInitialState(review) // nit defaults to REJECT
+    const sub = buildSubmission(state, true)
+    const comment = formatGitHubComment(review, sub)
+    expect(comment).not.toContain('💬 Nits')
+    expect(comment).not.toContain('Nit finding')
+  })
+
+  it('includes accepted nit in a Nits section', () => {
+    let state = buildInitialState(review)
+    // Override the nit to ACCEPT
+    state = toggleDecision(state, 'n1') // REJECT → ACCEPT
+    const sub = buildSubmission(state, true)
+    const comment = formatGitHubComment(review, sub)
+    expect(comment).toContain('💬 Nits')
+    expect(comment).toContain(nit.title)
+  })
+
+  it('omits nit section entirely when no nits exist on the review', () => {
+    const noNitReview: PRReview = { ...review, nits: [] }
+    const state = buildInitialState(noNitReview)
+    const sub = buildSubmission(state, true)
+    const comment = formatGitHubComment(noNitReview, sub)
+    expect(comment).not.toContain('💬 Nits')
   })
 })

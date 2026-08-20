@@ -168,11 +168,11 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
           typeof data.agentName === 'string' ? data.agentName : 'unknown'
         addActivity({ type: 'phase', text: `✓ ${agentName} agent complete` })
         domainDoneRef.current += 1
-        if (domainDoneRef.current >= 2) {
+        if (domainDoneRef.current >= 5) {
           setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'running' }))
           addActivity({
             type: 'phase',
-            text: '✓ Both domain agents done — generating summary',
+            text: '✓ All domain agents done — generating summary',
           })
         }
       } else if (data.stage === 'OUTPUT') {

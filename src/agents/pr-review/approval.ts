@@ -211,6 +211,23 @@ export function formatGitHubComment(
     lines.push('')
   }
 
+  const acceptedNits = accepted.filter(d => {
+    const f = byId.get(d.findingId)
+    return f?.severity === 'NIT'
+  })
+  if (acceptedNits.length > 0) {
+    lines.push('### 💬 Nits')
+    for (const d of acceptedNits) {
+      const f = byId.get(d.findingId)!
+      const title = d.editedTitle ?? f.title
+      const body = d.editedBody ?? f.body
+      lines.push(`\n**${title}** (\`${f.file}${f.line ? `:${f.line}` : ''}\`)`)
+      lines.push(body)
+      if (f.suggestedFix) lines.push(`\n> Suggested fix: ${f.suggestedFix}`)
+    }
+    lines.push('')
+  }
+
   if (review.whatLooksGood.length > 0) {
     lines.push('### ✅ What Looks Good')
     review.whatLooksGood.forEach(w => lines.push(`- ${w}`))

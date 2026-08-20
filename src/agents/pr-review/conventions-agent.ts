@@ -1,11 +1,7 @@
-import { randomUUID } from 'crypto'
 import type { ModelClient } from '../../harness/models'
-import {
-  DomainResultSchema,
-  type DomainResult,
-  type EnrichedContext,
-} from './schema'
+import type { DomainResult, EnrichedContext } from './schema'
 import { buildConventionsSystem, conventionsUserPrompt } from './prompts'
+import { parseDomainResult } from './domain-agent-utils'
 
 export interface ConventionsAgentOptions {
   enrichedContext: EnrichedContext
@@ -43,60 +39,4 @@ export async function runConventionsAgent(
     reply.usage.inputTokens + reply.usage.outputTokens,
     reply.cost
   )
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function parseDomainResult(
-  text: string,
-  domain: DomainResult['domain'],
-  durationMs: number,
-  tokensUsed: number,
-  cost: number
-): DomainResult {
-  const cleaned = text
-    .replace(/^```(?:json)?\n?/m, '')
-    .replace(/\n?```$/m, '')
-    .trim()
-
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-  if (jsonMatch) {
-    try {
-      const raw = JSON.parse(jsonMatch[0])
-      if (Array.isArray(raw.findings)) {
-        raw.findings = raw.findings.map((f: Record<string, unknown>) => ({
-          ...f,
-          id:
-            typeof f.id === 'string' && f.id !== '<uuid>' ? f.id : randomUUID(),
-          category: domain,
-        }))
-      }
-      const result = DomainResultSchema.safeParse({
-        ...raw,
-        domain,
-        durationMs,
-        tokensUsed,
-        cost,
-      })
-      if (result.success) return result.data
-    } catch {
-      // fall through
-    }
-  }
-
-  const debugSuffix =
-    process.env.DEBUG_LLM === 'true'
-      ? ` Raw output (first 500 chars): ${text.slice(0, 500)}`
-      : ''
-  console.warn(
-    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON.${debugSuffix}`
-  )
-  return {
-    domain,
-    findings: [],
-    confidence: 0,
-    tokensUsed,
-    cost,
-    durationMs,
-  }
 }
