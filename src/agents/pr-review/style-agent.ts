@@ -1,6 +1,6 @@
 import type { ModelClient } from '../../harness/models'
 import type { DomainResult, EnrichedContext } from './schema'
-import { CORRECTNESS_SYSTEM, correctnessUserPrompt } from './prompts'
+import { STYLE_SYSTEM, styleUserPrompt } from './prompts'
 import { parseDomainResult } from './domain-agent-utils'
 
 export interface DomainAgentOptions {
@@ -9,28 +9,28 @@ export interface DomainAgentOptions {
 }
 
 /**
- * Correctness Agent — single-shot structured output.
- * Receives EnrichedContext, returns DomainResult with CORRECTNESS findings.
+ * Style Agent — single-shot structured output.
+ * Receives EnrichedContext, returns DomainResult with STYLE findings.
  */
-export async function runCorrectnessAgent(
+export async function runStyleAgent(
   options: DomainAgentOptions
 ): Promise<DomainResult> {
   const { enrichedContext, model } = options
   const start = Date.now()
 
   const contextJson = JSON.stringify(enrichedContext, null, 2)
-  const userPrompt = correctnessUserPrompt(contextJson)
+  const userPrompt = styleUserPrompt(contextJson)
 
   const reply = await model.chat(
     [{ role: 'user', content: userPrompt }],
     [], // no tools — single-shot
-    CORRECTNESS_SYSTEM
+    STYLE_SYSTEM
   )
 
   const durationMs = Date.now() - start
   return parseDomainResult(
     reply.text,
-    'CORRECTNESS',
+    'STYLE',
     durationMs,
     reply.usage.inputTokens + reply.usage.outputTokens,
     reply.cost

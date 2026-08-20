@@ -68,16 +68,15 @@ describe('runReview (coordinator)', () => {
     mockModel = {
       chat: jest.fn(async (_messages, _tools, _systemPrompt) => {
         callCount++
-        // Call sequence in full mode:
-        // 1 = context agent loop call (produces EnrichedContext JSON)
-        // 2 = correctness agent (produces DomainResult)
-        // 3 = security agent (produces DomainResult)
-        // 4 = coordinator summary
-        if (callCount === 1) return makeModelReply(makeEnrichedContextJson())
-        if (callCount === 2)
+        // Call sequence in quick mode (5 domain agents run in parallel, then 1 summary):
+        // 1–5 = correctness / security / conventions / performance / style (parallel, any order)
+        // 6   = coordinator summary
+        //
+        // In full mode an extra context-agent call fires first (callCount 1),
+        // shifting domain calls to 2–6 and summary to 7. All current tests use
+        // quick mode, so we only need to handle up to call 6.
+        if (callCount <= 5)
           return makeModelReply(makeEmptyDomainResult('CORRECTNESS'))
-        if (callCount === 3)
-          return makeModelReply(makeEmptyDomainResult('SECURITY'))
         return makeModelReply(makeSummaryJson())
       }),
     }

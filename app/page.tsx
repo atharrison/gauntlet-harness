@@ -78,7 +78,7 @@ function HomePageContent() {
             <span className="font-semibold text-white">⚡ Quick mode</span>
             <span className="ml-2 text-gray-500">
               {quickMode
-                ? 'Correctness + security only (~30s)'
+                ? 'All domain agents, no context gathering (~60s)'
                 : 'Full review with context agent (~2 min)'}
             </span>
           </span>

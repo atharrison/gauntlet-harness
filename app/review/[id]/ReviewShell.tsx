@@ -168,15 +168,19 @@ export function ReviewShell({ reviewId, prUrl, mode = 'full' }: Props) {
           typeof data.agentName === 'string' ? data.agentName : 'unknown'
         addActivity({ type: 'phase', text: `✓ ${agentName} agent complete` })
         domainDoneRef.current += 1
-        if (domainDoneRef.current >= 2) {
-          setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'running' }))
-          addActivity({
-            type: 'phase',
-            text: '✓ Both domain agents done — generating summary',
-          })
-        }
       } else if (data.stage === 'OUTPUT') {
-        setPhaseStatuses(p => ({ ...p, OUTPUT: 'done' }))
+        // OUTPUT is the authoritative signal that all domain agents finished.
+        // Forcing DOMAIN→done here means the UI never hangs if an individual
+        // agent fails to emit its completion checkpoint (avoids hardcoding the
+        // agent count in client code).
+        setPhaseStatuses(p => ({ ...p, DOMAIN: 'done', OUTPUT: 'done' }))
+        addActivity({
+          type: 'phase',
+          text:
+            domainDoneRef.current > 0
+              ? '✓ All domain agents done — summary complete'
+              : '✓ Review summary complete',
+        })
       }
     })
 

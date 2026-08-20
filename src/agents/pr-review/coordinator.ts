@@ -4,6 +4,9 @@ import { PRReviewSchema, type PRReview, type EnrichedContext } from './schema'
 import { runContextAgent } from './context-agent'
 import { runCorrectnessAgent } from './correctness-agent'
 import { runSecurityAgent } from './security-agent'
+import { runConventionsAgent } from './conventions-agent'
+import { runPerformanceAgent } from './performance-agent'
+import { runStyleAgent } from './style-agent'
 import { mergeResults, bucketFindings } from './merge'
 import { coordinatorSummaryPrompt } from './prompts'
 import { withSpan } from '../../harness/observability'
@@ -15,8 +18,10 @@ export type ReviewEmitter = (event: string, data: unknown) => void
 export interface RunReviewOptions {
   reviewId: string
   prUrl: string
-  /** 'quick' skips the context agent and runs only correctness + security */
+  /** 'quick' skips the context agent and runs only the domain agents (no context gathering) */
   mode?: 'full' | 'quick'
+  /** Team conventions doc from Supabase settings. Falls back to built-in defaults when absent. */
+  conventionsDoc?: string
   context: ReviewContext
   emit?: ReviewEmitter
 }
@@ -25,7 +30,7 @@ export interface RunReviewOptions {
  * The Coordinator orchestrates the full multi-agent review:
  *
  *  Phase 1: Context Agent (full loop, tool calls) → EnrichedContext
- *  Phase 2: Domain agents in parallel (correctness + security)
+ *  Phase 2: Domain agents in parallel (correctness + security + conventions + performance + style)
  *  Phase 3: Merge + deduplicate findings
  *  Phase 4: Coordinator summary LLM call → PRReview
  *
@@ -52,7 +57,14 @@ async function _runReview(
   options: RunReviewOptions,
   rootSpan: import('@opentelemetry/api').Span
 ): Promise<PRReview> {
-  const { reviewId, prUrl, mode = 'full', context, emit = () => {} } = options
+  const {
+    reviewId,
+    prUrl,
+    mode = 'full',
+    context,
+    emit = () => {},
+    conventionsDoc,
+  } = options
   const { deps } = context
 
   const runStart = Date.now()
@@ -150,7 +162,13 @@ async function _runReview(
   const domainStart = Date.now()
   // Emit checkpoint events immediately; hold finding events until after merge
   // so the IDs the client receives match the merged PRReview exactly.
-  const [correctnessResult, securityResult] = await withSpan(
+  const [
+    correctnessResult,
+    securityResult,
+    conventionsResult,
+    performanceResult,
+    styleResult,
+  ] = await withSpan(
     'harness.review.domain',
     { 'review.id': reviewId },
     async span => {
@@ -173,21 +191,71 @@ async function _runReview(
           })
           return r
         }),
+        runConventionsAgent({
+          enrichedContext,
+          model: deps.model,
+          conventionsDoc,
+        }).then(r => {
+          emit('checkpoint', {
+            stage: 'DOMAIN',
+            agentName: 'conventions',
+            status: 'PASS',
+            reviewId,
+          })
+          return r
+        }),
+        runPerformanceAgent({ enrichedContext, model: deps.model }).then(r => {
+          emit('checkpoint', {
+            stage: 'DOMAIN',
+            agentName: 'performance',
+            status: 'PASS',
+            reviewId,
+          })
+          return r
+        }),
+        runStyleAgent({ enrichedContext, model: deps.model }).then(r => {
+          emit('checkpoint', {
+            stage: 'DOMAIN',
+            agentName: 'style',
+            status: 'PASS',
+            reviewId,
+          })
+          return r
+        }),
       ])
       span.setAttributes({
         'tokens.correctness': results[0].tokensUsed,
         'tokens.security': results[1].tokensUsed,
-        'findings.raw': results[0].findings.length + results[1].findings.length,
+        'tokens.conventions': results[2].tokensUsed,
+        'tokens.performance': results[3].tokensUsed,
+        'tokens.style': results[4].tokensUsed,
+        'findings.raw': results.reduce((n, r) => n + r.findings.length, 0),
       })
       return results
     }
   )
-  totalTokens += correctnessResult.tokensUsed + securityResult.tokensUsed
-  totalCost += correctnessResult.cost + securityResult.cost
+  totalTokens +=
+    correctnessResult.tokensUsed +
+    securityResult.tokensUsed +
+    conventionsResult.tokensUsed +
+    performanceResult.tokensUsed +
+    styleResult.tokensUsed
+  totalCost +=
+    correctnessResult.cost +
+    securityResult.cost +
+    conventionsResult.cost +
+    performanceResult.cost +
+    styleResult.cost
   phaseDurations.DOMAIN = Date.now() - domainStart
 
   // ── Phase 3: Merge ────────────────────────────────────────────────────────
-  const mergedFindings = mergeResults([correctnessResult, securityResult])
+  const mergedFindings = mergeResults([
+    correctnessResult,
+    securityResult,
+    conventionsResult,
+    performanceResult,
+    styleResult,
+  ])
   const { blockingIssues, suggestions, nits } = bucketFindings(mergedFindings)
 
   // Emit findings after merge so client IDs are stable and match the PRReview
@@ -238,7 +306,12 @@ async function _runReview(
             verdict: summaryData.verdict,
             verdictSummary: summaryData.verdictSummary,
             confidence:
-              (correctnessResult.confidence + securityResult.confidence) / 2,
+              (correctnessResult.confidence +
+                securityResult.confidence +
+                conventionsResult.confidence +
+                performanceResult.confidence +
+                styleResult.confidence) /
+              5,
           })
           return Promise.resolve({
             pass: parsed.success,

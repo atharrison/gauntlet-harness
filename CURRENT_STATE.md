@@ -1,5 +1,48 @@
 > **Starting a new session?** Run `/current-state` to orient before starting work.
 
+---
+
+# Session State — 2026-08-17 22:28
+
+## Context
+
+Gauntlet Harness — shipped ATH-16 (GitHub webhook receiver, PR #20) and ATH-31 (bypass URL entry from queue, PR #21). Both merged. 5+ review rounds on ATH-16; 2 rounds on ATH-31. Multiple new backlog tickets created; MVP/Remaining milestones set up.
+
+## Decisions Made
+
+- **Full auth before event-type branch** in webhook route: HMAC verification and DB lookup happen before checking `x-github-event`, so non-`pull_request` events still go through full auth (→ 204 after auth)
+- **`TIMING_DUMMY_SECRET` pattern**: unknown-repo and null-secret paths perform a dummy `verifyGitHubSignature` call to equalize timing and prevent repo enumeration
+- **All 401 bodies identical**: `{ error: 'Unauthorized' }` regardless of failure reason — prevents enumeration
+- **`reopened` uses `.update()` not upsert**: explicitly sets `updated_since_review: false` for deterministic state; avoids overwriting fields not owned by reopened event
+- **`startingId → Set<string>`** in QueueDisplay: per-row loading state; prevents race where clicking two PRs rapidly re-enables first row's button
+- **`res.text()` on error path**: avoids throw when server returns non-JSON (e.g. 502 HTML)
+
+## Tickets Touched
+
+- **ATH-16**: Done ✅ (PR #20 merged)
+- **ATH-31**: Done ✅ (PR #21 merged — review-driven hardening in final two commits)
+- **ATH-30, 32, 33, 34, 35, 36, 37**: All created in backlog; MVP vs Remaining milestones assigned
+
+## Open Questions / Blockers
+
+- Production webhook not yet wired: need `GITHUB_WEBHOOK_SECRET` Railway env var + GitHub repo webhook configured pointing to `/api/webhooks/github`
+- ATH-36 (webhook secret UI) blocks clean self-serve webhook setup
+
+## Next Steps
+
+1. Wire webhook in production: add `GITHUB_WEBHOOK_SECRET` to Railway, configure GitHub repo webhook
+2. ATH-37 (queue auto-refresh + manual refresh button) — small, good next ticket
+3. ATH-30 (link queue rows to past review output) — pairs well with ATH-37
+
+## Key Files
+
+- `app/api/webhooks/github/route.ts` — webhook receiver (full auth before event branch)
+- `src/lib/webhook.ts` — HMAC verify/compute utilities
+- `tests/api.webhooks.github.test.ts` — webhook route tests
+- `app/queue/QueueDisplay.tsx` — queue UI with hardened handleStartReview
+
+---
+
 # Session State — 2026-08-16 23:23
 
 ## Context
