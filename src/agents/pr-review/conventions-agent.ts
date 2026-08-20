@@ -1,0 +1,102 @@
+import { randomUUID } from 'crypto'
+import type { ModelClient } from '../../harness/models'
+import {
+  DomainResultSchema,
+  type DomainResult,
+  type EnrichedContext,
+} from './schema'
+import { buildConventionsSystem, conventionsUserPrompt } from './prompts'
+
+export interface ConventionsAgentOptions {
+  enrichedContext: EnrichedContext
+  model: ModelClient
+  /** Team conventions doc loaded from Supabase settings. Falls back to defaults when absent. */
+  conventionsDoc?: string
+}
+
+/**
+ * Conventions Agent — single-shot structured output.
+ * Receives EnrichedContext and an optional team conventions doc,
+ * returns DomainResult with CONVENTIONS findings.
+ */
+export async function runConventionsAgent(
+  options: ConventionsAgentOptions
+): Promise<DomainResult> {
+  const { enrichedContext, model, conventionsDoc } = options
+  const start = Date.now()
+
+  const contextJson = JSON.stringify(enrichedContext, null, 2)
+  const userPrompt = conventionsUserPrompt(contextJson, conventionsDoc)
+  const systemPrompt = buildConventionsSystem(conventionsDoc)
+
+  const reply = await model.chat(
+    [{ role: 'user', content: userPrompt }],
+    [], // no tools — single-shot
+    systemPrompt
+  )
+
+  const durationMs = Date.now() - start
+  return parseDomainResult(
+    reply.text,
+    'CONVENTIONS',
+    durationMs,
+    reply.usage.inputTokens + reply.usage.outputTokens,
+    reply.cost
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function parseDomainResult(
+  text: string,
+  domain: DomainResult['domain'],
+  durationMs: number,
+  tokensUsed: number,
+  cost: number
+): DomainResult {
+  const cleaned = text
+    .replace(/^```(?:json)?\n?/m, '')
+    .replace(/\n?```$/m, '')
+    .trim()
+
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    try {
+      const raw = JSON.parse(jsonMatch[0])
+      if (Array.isArray(raw.findings)) {
+        raw.findings = raw.findings.map((f: Record<string, unknown>) => ({
+          ...f,
+          id:
+            typeof f.id === 'string' && f.id !== '<uuid>' ? f.id : randomUUID(),
+          category: domain,
+        }))
+      }
+      const result = DomainResultSchema.safeParse({
+        ...raw,
+        domain,
+        durationMs,
+        tokensUsed,
+        cost,
+      })
+      if (result.success) return result.data
+    } catch {
+      // fall through
+    }
+  }
+
+  const debugSuffix =
+    process.env.DEBUG_LLM === 'true'
+      ? ` Raw output (first 500 chars): ${text.slice(0, 500)}`
+      : ''
+  console.warn(
+    `[${domain.toLowerCase()}-agent] Failed to parse DomainResult JSON.${debugSuffix}`
+  )
+  return {
+    domain,
+    findings: [],
+    confidence: 0,
+    tokensUsed,
+    cost,
+    durationMs,
+  }
+}
