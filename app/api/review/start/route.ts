@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { z } from 'zod'
 import { parsePrUrl } from '../../../../src/lib/queue'
-import { createSupabaseServiceRoleClient } from '../../../../src/lib/supabase/server'
+import { createReview } from '../../../../src/memory/review-store'
+import { markPrInReview } from '../../../../src/memory/tracked-pr-store'
 
 const StartReviewBody = z.object({
   prUrl: z.string().url('prUrl must be a valid GitHub PR URL'),
@@ -18,6 +19,33 @@ function checkPassword(submitted: string | undefined): boolean {
     .map(p => p.trim())
     .filter(Boolean)
   return valid.length === 0 || valid.includes(submitted ?? '')
+}
+
+/**
+ * Mint a review row (for last_review_id FK) and upsert the queue row to
+ * IN_REVIEW. Both writes are best-effort so a queue/DB blip cannot block
+ * starting a review — the SSE route will create the reviews row if missing.
+ */
+async function beginTrackedReview(
+  reviewId: string,
+  prUrl: string,
+  mode: 'full' | 'quick'
+): Promise<void> {
+  let reviewRowCreated = false
+  try {
+    await createReview(reviewId, prUrl, mode)
+    reviewRowCreated = true
+  } catch (err) {
+    console.error('[start] createReview failed:', err)
+  }
+
+  const prParsed = parsePrUrl(prUrl)
+  if (!prParsed) return
+  try {
+    await markPrInReview(prParsed, reviewRowCreated ? reviewId : null)
+  } catch (err) {
+    console.error('[start] tracked_prs IN_REVIEW upsert failed:', err)
+  }
 }
 
 /**
@@ -51,24 +79,7 @@ export async function POST(request: NextRequest) {
   }
 
   const reviewId = uuidv4()
-
-  // Best-effort: transition tracked_pr to IN_REVIEW if it exists in the queue.
-  const prParsed = parsePrUrl(parsed.data.prUrl)
-  if (prParsed) {
-    const service = createSupabaseServiceRoleClient()
-    const { error: transitionError } = await service
-      .from('tracked_prs')
-      .update({ status: 'IN_REVIEW' })
-      .eq('owner', prParsed.owner)
-      .eq('repo', prParsed.repo)
-      .eq('pr_number', prParsed.pr_number)
-      .eq('status', 'OPEN')
-    if (transitionError)
-      console.error(
-        '[start] tracked_prs IN_REVIEW transition failed:',
-        transitionError
-      )
-  }
+  await beginTrackedReview(reviewId, parsed.data.prUrl, parsed.data.mode)
 
   return NextResponse.json(
     { reviewId, prUrl: parsed.data.prUrl, mode: parsed.data.mode },
@@ -87,7 +98,7 @@ const GithubPrUrl = z
     message: 'prUrl must be a GitHub PR URL',
   })
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const prUrl = searchParams.get('prUrl')
 
@@ -108,6 +119,7 @@ export function GET(request: NextRequest) {
   }
 
   const reviewId = uuidv4()
+  await beginTrackedReview(reviewId, parsed.data, 'full')
   return NextResponse.redirect(
     new URL(
       `/review/${reviewId}?prUrl=${encodeURIComponent(parsed.data)}`,

@@ -98,20 +98,22 @@ export async function GET(
         return
       }
 
-      // Fresh run — create the review row, then run the pipeline.
-      // If this fails (e.g. wrong Supabase key, RLS error) we surface it
-      // immediately rather than silently running a review that can't be finalized.
-      try {
-        await createReview(reviewId, prUrl, mode)
-      } catch (err) {
-        console.error(`[review/${reviewId}] createReview failed:`, err)
-        send('error', {
-          error:
-            'Failed to initialize review — database write error. Check server logs for details.',
-        })
-        send('done', { reviewId })
-        controller.close()
-        return
+      // Fresh run — create the review row if start didn't already, then run
+      // the pipeline. Duplicate insert is skipped so ATH-15 can mint the row
+      // in /api/review/start (needed for tracked_prs.last_review_id FK).
+      if (!existing) {
+        try {
+          await createReview(reviewId, prUrl, mode)
+        } catch (err) {
+          console.error(`[review/${reviewId}] createReview failed:`, err)
+          send('error', {
+            error:
+              'Failed to initialize review — database write error. Check server logs for details.',
+          })
+          send('done', { reviewId })
+          controller.close()
+          return
+        }
       }
 
       try {
