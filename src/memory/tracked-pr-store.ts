@@ -9,7 +9,11 @@ import { createSupabaseServiceRoleClient } from '../lib/supabase/server'
 import type { ParsedPrUrl } from '../lib/queue'
 import { buildInReviewUpsert, buildReviewedPatch } from '../lib/tracked-prs'
 
-/** Upsert the queue row to IN_REVIEW and record last_review_id (re-review safe). */
+/** Upsert the queue row to IN_REVIEW and record last_review_id.
+ *
+ * No prior-status guard: a user-triggered start is a re-review, including
+ * CLOSED → IN_REVIEW. REVIEWED → IN_REVIEW is the ATH-15 acceptance path.
+ */
 export async function markPrInReview(
   parsed: ParsedPrUrl,
   reviewId: string | null

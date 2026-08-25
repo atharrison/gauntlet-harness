@@ -29,7 +29,11 @@ export interface TrackedPrReviewedPatch {
   last_review_id: string
 }
 
-/** Payload for upserting a queue row when a review starts (incl. re-review). */
+/** Payload for upserting a queue row when a review starts.
+ *
+ * Always IN_REVIEW — including when the existing row is CLOSED. Starting a
+ * review is an explicit user action and records that intent on the queue.
+ */
 export function buildInReviewUpsert(
   parsed: ParsedPrUrl,
   reviewId: string | null

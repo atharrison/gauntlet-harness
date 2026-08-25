@@ -42,6 +42,12 @@ describe('buildInReviewUpsert', () => {
       TrackedPrStatus.IN_REVIEW
     )
   })
+
+  it('always sets IN_REVIEW with no prior-status field (CLOSED is overwritten)', () => {
+    const row = buildInReviewUpsert(parsed, 'rev-1')
+    expect(row.status).toBe(TrackedPrStatus.IN_REVIEW)
+    expect(Object.keys(row)).not.toContain('prior_status')
+  })
 })
 
 describe('buildReviewedPatch', () => {
