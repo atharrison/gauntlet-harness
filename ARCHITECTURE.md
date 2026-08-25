@@ -686,7 +686,7 @@ function recordApprovalDecision(
 }
 ```
 
-**Dev:** OTLP → stdout (zero dependencies, structured JSON)
+**Dev:** set `OTEL_TRACES_EXPORTER=NONE` to disable tracing (avoids console span noise). Unset that and leave `OTEL_EXPORTER_OTLP_ENDPOINT` blank for stdout JSON.
 **Prod:** point `OTEL_EXPORTER_OTLP_ENDPOINT` at Langfuse, SigNoz, Datadog, or any OTel-compatible backend. No code change required.
 
 ---

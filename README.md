@@ -112,7 +112,7 @@ Every review emits a `stats` SSE event on completion — rendered live in the pi
 - **Per-phase timing bars** (INPUT / CONTEXT / DOMAIN / OUTPUT)
 - **OpenTelemetry spans** — `harness.review` root span with child spans per phase, attributes: `tokens.total`, `cost.usd`, `findings.count`, `review.verdict`
 - **Structured stdout log** — `harness_run_complete` JSON line on every run (queryable in Railway)
-- Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to Honeycomb, Jaeger, Datadog, etc.
+- Set `OTEL_TRACES_EXPORTER=NONE` to disable tracing (recommended for local dev). Set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to Honeycomb, Jaeger, Datadog, etc.
 
 ---
 
@@ -199,6 +199,7 @@ npm test
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes      | Supabase anon key                                              |
 | `SUPABASE_SERVICE_ROLE_KEY`            | Yes      | Supabase service role key                                      |
 | `LINEAR_API_KEY`                       | No       | Linear API key — ticket context degrades gracefully without it |
+| `OTEL_TRACES_EXPORTER`                 | No       | Set `NONE` to disable tracing (recommended for local dev)      |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`          | No       | Ship OTel traces to an external backend                        |
 | `DRY_RUN`                              | No       | Set `true` to suppress all GitHub writes (safe for dev/demo)   |
 | `DEBUG_LLM`                            | No       | Set `true` to log raw LLM output on parse failures             |
