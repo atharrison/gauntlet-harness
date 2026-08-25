@@ -33,18 +33,12 @@ jest.mock('../src/memory/index', () => ({
 
 jest.mock('../src/lib/supabase/server', () => ({
   getGitHubToken: jest.fn().mockResolvedValue(null),
-  createSupabaseServiceRoleClient: jest.fn().mockReturnValue({
-    from: jest.fn().mockReturnValue({
-      update: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({ error: null }),
-          }),
-        }),
-      }),
-    }),
-  }),
   GH_TOKEN_COOKIE: 'gh_provider_token',
+}))
+
+const mockMarkPrReviewed = jest.fn().mockResolvedValue(undefined)
+jest.mock('../src/memory/tracked-pr-store', () => ({
+  markPrReviewed: (...args: unknown[]) => mockMarkPrReviewed(...args),
 }))
 
 // ── Mock approval helpers ─────────────────────────────────────────────────────
@@ -55,10 +49,13 @@ jest.mock('../src/agents/pr-review/approval', () => ({
   formatApprovalComment: jest.fn().mockReturnValue('LGTM!'),
 }))
 
-// ── Mock Octokit (not needed for these tests) ─────────────────────────────────
+// ── Mock Octokit (comment posting) ────────────────────────────────────────────
+
+const mockCreateComment = jest.fn()
+const mockCreateOctokit = jest.fn().mockReturnValue(null)
 
 jest.mock('../src/tools/github', () => ({
-  createOctokit: jest.fn().mockReturnValue(null),
+  createOctokit: (...args: unknown[]) => mockCreateOctokit(...args),
 }))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -98,6 +95,10 @@ async function callFinalize(reviewId: string, body: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockMarkPrReviewed.mockResolvedValue(undefined)
+  mockStoreReview.mockResolvedValue(undefined)
+  mockCreateOctokit.mockReturnValue(null)
+  delete process.env.DRY_RUN
 })
 
 describe('POST /api/review/[id]/finalize — input validation', () => {
@@ -120,6 +121,15 @@ describe('POST /api/review/[id]/finalize — input validation', () => {
     expect(res.status).toBe(422)
   })
 
+  it('returns 500 when getReview throws', async () => {
+    mockGetReview.mockRejectedValue(new Error('db down'))
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await callFinalize(REVIEW_ID, { decisions: [], approve: true })
+    expect(res.status).toBe(500)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
   it('returns 404 when review not found', async () => {
     mockGetReview.mockResolvedValue(null)
     const res = await callFinalize(REVIEW_ID, { decisions: [], approve: true })
@@ -139,6 +149,14 @@ describe('POST /api/review/[id]/finalize — input validation', () => {
     const res = await callFinalize(REVIEW_ID, { decisions: [] })
     expect(res.status).toBe(400)
   })
+
+  it('returns 400 when submit path has empty decisions on a clean review', async () => {
+    mockGetReview.mockResolvedValue(makeCompleteReview(false))
+    const res = await callFinalize(REVIEW_ID, { decisions: [] })
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/approve:true/)
+  })
 })
 
 describe('POST /api/review/[id]/finalize — approve path', () => {
@@ -149,6 +167,14 @@ describe('POST /api/review/[id]/finalize — approve path', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.status).toBe('approved')
+    expect(mockMarkPrReviewed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'atharrison',
+        repo: 'gauntlet-harness',
+        pr_number: 18,
+      }),
+      REVIEW_ID
+    )
   })
 
   it('returns 500 when setReviewSubmission throws (approve path)', async () => {
@@ -158,6 +184,7 @@ describe('POST /api/review/[id]/finalize — approve path', () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/persist/i)
+    expect(mockMarkPrReviewed).not.toHaveBeenCalled()
   })
 })
 
@@ -171,6 +198,14 @@ describe('POST /api/review/[id]/finalize — submit path', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.status).toBe('finalized')
+    expect(mockMarkPrReviewed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'atharrison',
+        repo: 'gauntlet-harness',
+        pr_number: 18,
+      }),
+      REVIEW_ID
+    )
   })
 
   it('returns 500 when setReviewSubmission throws (submit path)', async () => {
@@ -180,5 +215,134 @@ describe('POST /api/review/[id]/finalize — submit path', () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/persist/i)
+    expect(mockMarkPrReviewed).not.toHaveBeenCalled()
+  })
+
+  it('still returns 200 when markPrReviewed fails (best-effort)', async () => {
+    mockGetReview.mockResolvedValue(makeCompleteReview(true))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    mockMarkPrReviewed.mockRejectedValue(new Error('db down'))
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await callFinalize(REVIEW_ID, { decisions })
+    expect(res.status).toBe(200)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('still returns 200 when storeReview fails (best-effort)', async () => {
+    mockGetReview.mockResolvedValue(makeCompleteReview(true))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    mockStoreReview.mockRejectedValue(new Error('history write failed'))
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await callFinalize(REVIEW_ID, { decisions })
+    expect(res.status).toBe(200)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('skips GitHub comment when postComment is true but Octokit is unavailable', async () => {
+    mockGetReview.mockResolvedValue(makeCompleteReview(true))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    const res = await callFinalize(REVIEW_ID, {
+      decisions,
+      postComment: true,
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.comment).toEqual({
+      skipped: true,
+      reason: 'GITHUB_TOKEN not configured',
+    })
+  })
+})
+
+describe('POST /api/review/[id]/finalize — GitHub comment + tracked_prs edges', () => {
+  it('does not call markPrReviewed when prUrl is not a GitHub PR', async () => {
+    const review = makeCompleteReview(false)
+    review.pr_url = 'https://example.com/not-a-pr'
+    mockGetReview.mockResolvedValue(review)
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    mockCreateOctokit.mockReturnValue({
+      issues: { createComment: mockCreateComment },
+    })
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const res = await callFinalize(REVIEW_ID, {
+      approve: true,
+      decisions: [],
+      postComment: true,
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(mockMarkPrReviewed).not.toHaveBeenCalled()
+    expect(body.comment).toEqual({
+      skipped: true,
+      reason: 'Could not parse prUrl for GitHub API',
+    })
+    expect(body.warning).toMatch(/prUrl could not be parsed/)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('posts an approval comment on DRY_RUN without calling GitHub', async () => {
+    process.env.DRY_RUN = 'true'
+    mockCreateOctokit.mockReturnValue({
+      issues: { createComment: mockCreateComment },
+    })
+    mockGetReview.mockResolvedValue(makeCompleteReview(false))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    const res = await callFinalize(REVIEW_ID, {
+      approve: true,
+      decisions: [],
+      postComment: true,
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.comment).toEqual({ dryRun: true, body: 'LGTM!' })
+    expect(mockCreateComment).not.toHaveBeenCalled()
+  })
+
+  it('posts a findings comment via Octokit on the submit path', async () => {
+    mockCreateOctokit.mockReturnValue({
+      issues: { createComment: mockCreateComment },
+    })
+    mockCreateComment.mockResolvedValue({
+      data: { id: 99, html_url: 'https://github.com/comment/99' },
+    })
+    mockGetReview.mockResolvedValue(makeCompleteReview(true))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    const res = await callFinalize(REVIEW_ID, {
+      decisions: [{ findingId: 'f1', action: 'ACCEPT' }],
+      postComment: true,
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.comment).toEqual({
+      id: 99,
+      url: 'https://github.com/comment/99',
+    })
+    expect(mockCreateComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'atharrison',
+        repo: 'gauntlet-harness',
+        issue_number: 18,
+      })
+    )
+  })
+
+  it('records a comment error when Octokit throws', async () => {
+    mockCreateOctokit.mockReturnValue({
+      issues: { createComment: mockCreateComment },
+    })
+    mockCreateComment.mockRejectedValue(new Error('rate limited'))
+    mockGetReview.mockResolvedValue(makeCompleteReview(false))
+    mockSetReviewSubmission.mockResolvedValue(undefined)
+    const res = await callFinalize(REVIEW_ID, {
+      approve: true,
+      decisions: [],
+      postComment: true,
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.comment.error).toMatch(/rate limited/)
   })
 })

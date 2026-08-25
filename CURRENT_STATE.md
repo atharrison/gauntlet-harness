@@ -2,6 +2,47 @@
 
 ---
 
+# Session State — 2026-08-24 22:10
+
+## Context
+
+Gauntlet Harness — shipped ATH-38 (optional OTel tracing) via PR #23, merged tonight. Local `.env` now has `OTEL_TRACES_EXPORTER=NONE` so `npm run dev` stays quiet.
+
+## Decisions Made
+
+- **`OtelExporter` enum (`NONE|CONSOLE|OTLP`)**: UPPER_CASE string values; documented env is `NONE`; lowercase `none` accepted via `toUpperCase()`
+- **`withSpan` early-return when disabled**: does not call `end`/`setStatus` on the no-op span; `NOOP_SPAN` still implements those methods so callbacks cannot throw
+- **`initTracer()` first-call-wins**: `_tracingEnabled` set before `_initialized` on the NONE path; later env changes are ignored
+- **Redact OTLP endpoint in init log**: strip userinfo/query/hash so collector credentials never hit stdout
+- **`CURRENT_STATE.md` belongs in feature PRs**: running ledger for future agents, not something to exclude from the ticket diff
+
+## Tickets Touched
+
+- **ATH-38**: Done ✅ (PR #23 merged — three exporter modes + review-round hardening)
+
+## What Was Tried and Abandoned
+
+- Documenting the env default as OTel-standard lowercase `none`: Andrew wants `NONE` as the canonical documented value
+
+## Open Questions / Blockers
+
+- Production webhook still not wired (ATH-36 prerequisite)
+- `conventionsDoc` loading from Supabase `settings` deferred to ATH-23
+
+## Next Steps
+
+1. ATH-15 (wire `tracked_prs` to review lifecycle)
+2. ATH-30 (link queue rows to past review output)
+3. ATH-37 (queue auto-refresh) — small, still open
+
+## Key Files
+
+- `src/harness/observability.ts` — `OtelExporter`, `isNoneExporter()`, `redactOtlpEndpoint()`, `NOOP_SPAN`
+- `tests/harness.observability.test.ts` — three-mode coverage + first-init-wins + URL redaction
+- `.env.example` — `OTEL_TRACES_EXPORTER=NONE`
+
+---
+
 # Session State — 2026-08-19 22:45
 
 ## Context

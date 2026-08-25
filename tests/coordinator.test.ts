@@ -17,24 +17,6 @@ function makeModelReply(text: string): ModelReply {
   }
 }
 
-function makeEnrichedContextJson(): string {
-  return JSON.stringify({
-    prUrl: 'https://github.com/owner/repo/pull/1',
-    prTitle: 'Test PR',
-    prAuthor: 'dev',
-    prBranch: 'feature/test',
-    diff: '--- a/src/foo.ts\n+++ b/src/foo.ts\n@@ -1 +1 @@\n+const x = 1',
-    filesChanged: ['src/foo.ts'],
-    fileCoverage: [{ file: 'src/foo.ts', status: 'READ' }],
-    ticketId: null,
-    ticketSummary: null,
-    ticketAcceptanceCriteria: [],
-    pastReviewSummaries: [],
-    memories: [],
-    externalContextCalls: 2,
-  })
-}
-
 function makeEmptyDomainResult(domain: string): string {
   return JSON.stringify({
     domain,

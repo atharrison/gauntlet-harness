@@ -11,10 +11,9 @@ import {
   buildSubmission,
 } from '../../../../../src/agents/pr-review/approval'
 import { createOctokit } from '../../../../../src/tools/github'
-import {
-  getGitHubToken,
-  createSupabaseServiceRoleClient,
-} from '../../../../../src/lib/supabase/server'
+import { getGitHubToken } from '../../../../../src/lib/supabase/server'
+import { parsePrUrl } from '../../../../../src/lib/queue'
+import { markPrReviewed } from '../../../../../src/memory/tracked-pr-store'
 import type { FindingDecision } from '../../../../../src/agents/pr-review/schema'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -38,21 +37,20 @@ const FinalizeBody = z.object({
  * Mark the corresponding tracked_pr as REVIEWED and record which review
  * produced it. Awaited before the response is sent so the transition is
  * guaranteed to complete (important in serverless environments).
+ *
+ * `review_count` is incremented by the `tracked_prs_on_reviewed` DB trigger.
  */
 async function markTrackedPrReviewed(
-  prUrlParts: RegExpMatchArray | null,
+  prUrl: string,
   reviewId: string
 ): Promise<void> {
-  if (!prUrlParts) return
-  const service = createSupabaseServiceRoleClient()
-  const { error } = await service
-    .from('tracked_prs')
-    .update({ status: 'REVIEWED', last_review_id: reviewId })
-    .eq('owner', prUrlParts[1])
-    .eq('repo', prUrlParts[2])
-    .eq('pr_number', Number(prUrlParts[3]))
-  if (error)
-    console.error('[finalize] tracked_prs REVIEWED transition failed:', error)
+  const parsed = parsePrUrl(prUrl)
+  if (!parsed) return
+  try {
+    await markPrReviewed(parsed, reviewId)
+  } catch (err) {
+    console.error('[finalize] tracked_prs REVIEWED transition failed:', err)
+  }
 }
 
 // ── POST /api/review/[id]/finalize ────────────────────────────────────────────
@@ -214,7 +212,7 @@ export async function POST(
         { status: 500 }
       )
     }
-    await markTrackedPrReviewed(prUrlParts, reviewId)
+    await markTrackedPrReviewed(prUrl, reviewId)
     return NextResponse.json({
       reviewId,
       status: 'approved',
@@ -308,7 +306,7 @@ export async function POST(
       { status: 500 }
     )
   }
-  await markTrackedPrReviewed(prUrlParts, reviewId)
+  await markTrackedPrReviewed(prUrl, reviewId)
   return NextResponse.json({
     reviewId,
     status: 'finalized',
