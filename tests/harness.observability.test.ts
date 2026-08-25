@@ -254,6 +254,9 @@ describe('initTracer', () => {
 
     const result = await withSpan('disabled-span', { a: 1 }, async span => {
       span.setAttributes({ 'tokens.total': 0 })
+      span.setStatus({ code: 1 })
+      span.recordException(new Error('ignored'))
+      span.end()
       return 'ok'
     })
 
@@ -274,5 +277,54 @@ describe('initTracer', () => {
       })
     ).rejects.toThrow('boom')
     expect(startSpan).not.toHaveBeenCalled()
+  })
+
+  it('does not re-enable tracing if env changes after the first init', async () => {
+    process.env.OTEL_TRACES_EXPORTER = 'NONE'
+    const { initTracer, withSpan, api, sdk } = await loadObservability()
+    initTracer()
+    delete process.env.OTEL_TRACES_EXPORTER
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318/v1/traces'
+    initTracer()
+    expect(sdk.NodeTracerProvider).not.toHaveBeenCalled()
+    const startSpan = api.trace.getTracer().startSpan as jest.Mock
+    startSpan.mockClear()
+    await withSpan('still-disabled', {}, async () => 'ok')
+    expect(startSpan).not.toHaveBeenCalled()
+  })
+
+  it('redacts credentials from the OTLP endpoint in the init log', async () => {
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
+      'https://user:secret@collector.example/v1/traces?api_key=abc'
+    const { initTracer, OtelExporter } = await loadObservability()
+    initTracer()
+    await new Promise<void>(resolve => {
+      setImmediate(resolve)
+    })
+    expect(log).toHaveBeenCalledWith(
+      JSON.stringify({
+        harness_otel_init: {
+          exporter: OtelExporter.OTLP,
+          endpoint: 'https://collector.example/v1/traces',
+        },
+      })
+    )
+  })
+
+  it('logs a placeholder when the OTLP endpoint is not a valid URL', async () => {
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'not-a-url'
+    const { initTracer, OtelExporter } = await loadObservability()
+    initTracer()
+    await new Promise<void>(resolve => {
+      setImmediate(resolve)
+    })
+    expect(log).toHaveBeenCalledWith(
+      JSON.stringify({
+        harness_otel_init: {
+          exporter: OtelExporter.OTLP,
+          endpoint: '[unparseable-endpoint]',
+        },
+      })
+    )
   })
 })

@@ -41,9 +41,16 @@ export enum OtelExporter {
 let _initialized = false
 let _tracingEnabled = true
 
-/** Minimal span so callers can still `setAttributes` when tracing is off. */
+/**
+ * Span handed to `withSpan` callbacks when tracing is off. Includes
+ * `setAttributes` (used by the coordinator) plus `end` / `setStatus` /
+ * `recordException` so a callback that uses the Span interface does not throw.
+ */
 const NOOP_SPAN = {
   setAttributes() {},
+  setStatus() {},
+  recordException() {},
+  end() {},
 } as unknown as Span
 
 /** Canonical value is `NONE`; lowercase `none` (OTel spelling) is accepted too. */
@@ -51,17 +58,37 @@ function isNoneExporter(): boolean {
   return process.env.OTEL_TRACES_EXPORTER?.toUpperCase() === OtelExporter.NONE
 }
 
+/** Strip userinfo, query, and hash so collector credentials never hit stdout. */
+function redactOtlpEndpoint(endpoint: string): string {
+  try {
+    const url = new URL(endpoint)
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return '[unparseable-endpoint]'
+  }
+}
+
+/**
+ * First call wins. Later calls are no-ops even if env vars changed —
+ * `_initialized` and `_tracingEnabled` stay in lockstep.
+ */
 export function initTracer(): void {
   if (_initialized) return
-  _initialized = true
 
   if (isNoneExporter()) {
     _tracingEnabled = false
+    _initialized = true
     console.log(
       JSON.stringify({ harness_otel_init: { exporter: OtelExporter.NONE } })
     )
     return
   }
+
+  _initialized = true
 
   const provider = new NodeTracerProvider()
 
@@ -79,7 +106,7 @@ export function initTracer(): void {
           JSON.stringify({
             harness_otel_init: {
               exporter: OtelExporter.OTLP,
-              endpoint: otlpEndpoint,
+              endpoint: redactOtlpEndpoint(otlpEndpoint),
             },
           })
         )
