@@ -2,6 +2,45 @@
 
 ---
 
+# Session State — 2026-08-19 22:45
+
+## Context
+
+Gauntlet Harness — shipped ATH-17 (Conventions, Performance, and Style agents) via PR #22, merged tonight. Also fixed two bugs discovered via self-review: silent Zod error swallowing in parseDomainResult, and NITs not appearing in the posted GitHub comment.
+
+## Decisions Made
+
+- **`parseDomainResult` extracted to `domain-agent-utils.ts`**: eliminates copy-paste across all 5 agent files; fixes silent Zod validation failures (now warns explicitly) and ensures bug fixes propagate to all agents automatically
+- **`conventionsDoc?: string` in `RunReviewOptions`**: conventions agent accepts optional team conventions doc threaded from coordinator; falls back to built-in defaults; ready for ATH-23 (in-app editor) with no coordinator changes
+- **NIT section added to `formatGitHubComment`**: NITs were accepted in the UI but silently dropped — no rendering block existed for them; added `### 💬 Nits` section, only renders when user explicitly accepts a NIT
+- **OUTPUT checkpoint as authoritative DOMAIN→done signal**: removed hardcoded `>= 5` agent count from ReviewShell; DOMAIN phase now transitions on OUTPUT checkpoint (server-authoritative), so UI never hangs if an agent fails to emit its checkpoint
+- **ATH-38 created**: OTel tracing optional (`OTEL_TRACES_EXPORTER=none`) — no off switch existed for local dev console noise
+
+## Tickets Touched
+
+- **ATH-17**: Done ✅ (PR #22 merged — conventions/performance/style agents + domain-agent-utils refactor + NIT rendering + DOMAIN phase hang fix)
+- **ATH-38**: Created — make OTel tracing optional for local dev
+
+## Open Questions / Blockers
+
+- Production webhook still not wired (ATH-36 prerequisite)
+- `conventionsDoc` loading from Supabase `settings` deferred to ATH-23
+
+## Next Steps
+
+1. ATH-38 (OTel `OTEL_TRACES_EXPORTER=none`) — quick win, reduce local dev console noise
+2. ATH-15 (wire `tracked_prs` to review lifecycle) — closes the loop so queue → review → done is tracked
+3. ATH-30 (link queue rows to past review output) — pairs naturally after ATH-15
+
+## Key Files
+
+- `src/agents/pr-review/domain-agent-utils.ts` — shared parseDomainResult (new)
+- `src/agents/pr-review/conventions-agent.ts`, `performance-agent.ts`, `style-agent.ts` — new domain agents
+- `src/agents/pr-review/approval.ts` — NIT section added to formatGitHubComment
+- `app/review/[id]/ReviewShell.tsx` — DOMAIN phase hang fix (OUTPUT checkpoint-driven)
+
+---
+
 # Session State — 2026-08-17 22:28
 
 ## Context
